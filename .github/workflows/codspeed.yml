@@ -355,9 +355,10 @@ jobs:
   perfcompare:
     name: ${{ matrix.client }}-${{ matrix.server }}${{ matrix.cubic && '-cubic' || '' }}${{ matrix.pacing && '' || '-nopacing' }}
     needs: [build-neqo, build-msquic, build-google, build-quiche, build-s2n]
-    runs-on: # zizmor: ignore[self-hosted-runner]
-      group: codspeed
-      labels: codspeed-macro
+    # runs-on: # zizmor: ignore[self-hosted-runner]
+    #   group: codspeed
+    #   labels: codspeed-macro
+    runs-on: codspeed-macro
     strategy:
       fail-fast: false
       matrix:
