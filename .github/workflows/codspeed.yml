@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTUP_TOOLCHAIN: stable
   # Performance comparison settings
-  TRANSFER_SIZE: 33554432  # 32 MiB
+  TRANSFER_SIZE: 33554432 # 32 MiB
   # Runner image for build jobs. Keep in sync with runs-on values below.
   BUILD_RUNNER: ubuntu-22.04-arm
   # Bump this to invalidate all caches for other reasons
@@ -27,6 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  id-token: write
   contents: read
 
 defaults:
@@ -34,57 +35,6 @@ defaults:
     shell: bash
 
 jobs:
-  bench-matrix:
-    name: Determine bench matrix
-    runs-on: ubuntu-24.04
-    outputs:
-      benches: ${{ steps.benches.outputs.benches }}
-      walltime-benches: ${{ steps.benches.outputs.walltime_benches }}
-      has-walltime: ${{ steps.benches.outputs.has_walltime }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - id: benches
-        run: |
-          ALL_BENCHES=$(cargo metadata --no-deps --format-version 1 | jq -c '
-            [.packages[] |
-              . as $pkg |
-              .targets[] |
-              select(.kind[] == "bench") |
-              select(has("required-features")) |
-              .name as $bench_name |
-              (($pkg.metadata.bench // []) | map(select(.name == $bench_name)) | .[0]) as $bench_meta |
-              (($bench_meta.codspeed.mode) // "simulation") as $cpu_mode |
-              (if $bench_meta.codspeed.memory == null then true else $bench_meta.codspeed.memory end) as $memory_enabled |
-              (
-                {
-                  crate: $pkg.name,
-                  bench: $bench_name,
-                  mode: $cpu_mode
-                },
-                if $memory_enabled then
-                  {
-                    crate: $pkg.name,
-                    bench: $bench_name,
-                    mode: "memory"
-                  }
-                else
-                  empty
-                end
-              )
-            ]')
-
-          NON_WALLTIME=$(echo "$ALL_BENCHES" | jq -c '[.[] | select(.mode != "walltime") | . + {runner: "ubuntu-24.04"}]')
-          WALLTIME=$(echo "$ALL_BENCHES" | jq -c '[.[] | select(.mode == "walltime")]')
-          HAS_WALLTIME=$(echo "$WALLTIME" | jq 'length > 0')
-
-          {
-            echo "benches=$NON_WALLTIME"
-            echo "walltime_benches=$WALLTIME"
-            echo "has_walltime=$HAS_WALLTIME"
-          } >> "$GITHUB_OUTPUT"
-
   # Build neqo for walltime benchmarks and perfcompare on ARM64.
   # CodSpeed's macro runners are aarch64, so we build on ARM for compatibility.
   # Using ubuntu-22.04 for glibc compatibility with CodSpeed runners.
@@ -402,91 +352,6 @@ jobs:
           path: dist/s2n-quic
           retention-days: 1
 
-  benchmarks:
-    name: Run ${{ matrix.bench.bench }} (${{ matrix.bench.mode }})
-    runs-on: ${{ matrix.bench.runner }}
-    needs: bench-matrix
-    if: ${{ needs.bench-matrix.outputs.benches != '[]' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        bench: ${{ fromJson(needs.bench-matrix.outputs.benches) }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/rust
-        with:
-          version: stable
-          tools: cargo-codspeed
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - id: nss-version
-        run: echo "minimum=$(cat neqo-crypto/min_version.txt)" >> "$GITHUB_OUTPUT"
-
-      - uses: ./.github/actions/nss
-        with:
-          minimum-version: ${{ steps.nss-version.outputs.minimum }}
-
-      - name: Build bench
-        env:
-          BENCH: ${{ matrix.bench.bench }}
-          CRATE: ${{ matrix.bench.crate }}
-          MODE: ${{ matrix.bench.mode }}
-        run: cargo codspeed build --package "$CRATE" --locked --features bench --bench "$BENCH" --measurement-mode "$MODE"
-
-      - name: Run bench & upload results
-        uses: CodSpeedHQ/action@0700edb451d0e9f2426f99bd6977027e550fb2a6 # v4.7.0
-        with:
-          mode: ${{ matrix.bench.mode }}
-          run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
-
-  benchmarks-walltime:
-    name: Run ${{ matrix.bench.bench }} (walltime)
-    runs-on: # zizmor: ignore[self-hosted-runner]
-      group: codspeed
-      labels: codspeed-macro
-    needs: [bench-matrix, build-neqo]
-    if: ${{ needs.bench-matrix.outputs.has-walltime == 'true' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        bench: ${{ fromJson(needs.bench-matrix.outputs.walltime-benches) }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/rust
-        with:
-          version: stable
-          tools: cargo-codspeed
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-neqo
-          path: dist
-
-      - name: Set up build artifacts
-        run: |
-          mkdir -p target
-          mv dist/codspeed target/
-          find target/codspeed -type f -exec chmod +x {} +
-          {
-            echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/dist/lib:$LD_LIBRARY_PATH"
-            echo "NSS_DB_PATH=$GITHUB_WORKSPACE/dist/test-fixture/db"
-          } >> "$GITHUB_ENV"
-
-      - name: Run bench & upload results
-        uses: CodSpeedHQ/action@0700edb451d0e9f2426f99bd6977027e550fb2a6 # v4.7.0
-        with:
-          mode: walltime
-          run: cargo codspeed run --package ${{ matrix.bench.crate }} --bench ${{ matrix.bench.bench }}
-          token: ${{ secrets.CODSPEED_TOKEN }}
-
   perfcompare:
     name: ${{ matrix.client }}-${{ matrix.server }}${{ matrix.cubic && '-cubic' || '' }}${{ matrix.pacing && '' || '-nopacing' }}
     needs: [build-neqo, build-msquic, build-google, build-quiche, build-s2n]
@@ -497,18 +362,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {client: neqo,   server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: neqo,   cubic: true,  pacing: false}
-          - {client: neqo,   server: neqo,   cubic: false, pacing: true}
-          - {client: neqo,   server: neqo,   cubic: false, pacing: false}
-          - {client: neqo,   server: msquic, cubic: true,  pacing: true}
-          - {client: msquic, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: google, cubic: true,  pacing: true}
-          - {client: google, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: quiche, cubic: true,  pacing: true}
-          - {client: quiche, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: s2n,    cubic: true,  pacing: true}
-          - {client: s2n,    server: neqo,   cubic: true,  pacing: true}
+          - { client: neqo, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: neqo, cubic: true, pacing: false }
+          - { client: neqo, server: neqo, cubic: false, pacing: true }
+          - { client: neqo, server: neqo, cubic: false, pacing: false }
+          - { client: neqo, server: msquic, cubic: true, pacing: true }
+          - { client: msquic, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: google, cubic: true, pacing: true }
+          - { client: google, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: quiche, cubic: true, pacing: true }
+          - { client: quiche, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: s2n, cubic: true, pacing: true }
+          - { client: s2n, server: neqo, cubic: true, pacing: true }
     env:
       HOST: 127.0.0.1
       PORT: 4433
@@ -621,7 +486,7 @@ jobs:
         with:
           mode: walltime
           working-directory: /tmp
-          token: ${{ secrets.CODSPEED_TOKEN }}
+          runner-version: branch:main
 
       - name: Verify transfer
         working-directory: /tmp
