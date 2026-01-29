@@ -481,6 +481,9 @@ jobs:
             echo "      min-rounds: 500"
           } > codspeed.yml
 
+      # Build the codpseed runner
+      - run: rustup toolchain install stable
+
       # TODO: Pin to release version once CodSpeed releases config file support
       - name: Run benchmark
         uses: CodSpeedHQ/action@main # zizmor: ignore[unpinned-uses]
