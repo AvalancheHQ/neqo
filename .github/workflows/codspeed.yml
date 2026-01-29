@@ -491,7 +491,7 @@ jobs:
           mode: walltime
           working-directory: /tmp
           #TODO: Remove this
-          runner-version: branch:main
+          runner-version: branch:perf-metadata-bufwriter
 
       - name: Verify transfer
         working-directory: /tmp
