@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTUP_TOOLCHAIN: stable
   # Performance comparison settings
-  TRANSFER_SIZE: 33554432  # 32 MiB
+  TRANSFER_SIZE: 33554432 # 32 MiB
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -160,115 +160,33 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifact-name: build-s2n
 
-  benchmarks:
-    name: Run ${{ matrix.bench.bench }} (${{ matrix.bench.mode }})
-    runs-on: ${{ matrix.bench.runner }}
-    needs: bench-matrix
-    if: ${{ needs.bench-matrix.outputs.benches != '[]' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        bench: ${{ fromJson(needs.bench-matrix.outputs.benches) }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/rust
-        with:
-          version: stable
-          tools: cargo-codspeed
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: ./.github/actions/nss
-
-      - name: Build bench
-        env:
-          BENCH: ${{ matrix.bench.bench }}
-          CRATE: ${{ matrix.bench.crate }}
-          MODE: ${{ matrix.bench.mode }}
-        run: cargo codspeed build --package "$CRATE" --locked --features bench --bench "$BENCH" --measurement-mode "$MODE"
-
-      - name: Run bench & upload results
-        uses: CodSpeedHQ/action@0700edb451d0e9f2426f99bd6977027e550fb2a6 # v4.7.0
-        with:
-          mode: ${{ matrix.bench.mode }}
-          run: cargo codspeed run
-          token: ${{ secrets.CODSPEED_TOKEN }}
-
-  benchmarks-walltime:
-    name: Run ${{ matrix.bench.bench }} (walltime)
-    runs-on: # zizmor: ignore[self-hosted-runner]
-      group: codspeed
-      labels: codspeed-macro
-    needs: [bench-matrix, build-neqo]
-    if: ${{ needs.bench-matrix.outputs.has-walltime == 'true' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        bench: ${{ fromJson(needs.bench-matrix.outputs.walltime-benches) }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/rust
-        with:
-          version: stable
-          tools: cargo-codspeed
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-neqo
-          path: dist
-
-      - name: Set up build artifacts
-        run: |
-          mkdir -p target
-          mv dist/codspeed target/
-          find target/codspeed -type f -exec chmod +x {} +
-          {
-            echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/dist/lib:$LD_LIBRARY_PATH"
-            echo "NSS_DB_PATH=$GITHUB_WORKSPACE/dist/test-fixture/db"
-          } >> "$GITHUB_ENV"
-
-      - name: Run bench & upload results
-        uses: CodSpeedHQ/action@0700edb451d0e9f2426f99bd6977027e550fb2a6 # v4.7.0
-        with:
-          mode: walltime
-          run: cargo codspeed run --package ${{ matrix.bench.crate }} --bench ${{ matrix.bench.bench }}
-          token: ${{ secrets.CODSPEED_TOKEN }}
-
   perfcompare:
     name: ${{ matrix.client }}-${{ matrix.server }}${{ matrix.cubic && '-cubic' || '' }}${{ matrix.pacing == false && '-nopacing' || '' }}
     needs: [build-neqo, build-msquic, build-google, build-quiche, build-s2n]
-    runs-on: # zizmor: ignore[self-hosted-runner]
-      group: codspeed
-      labels: codspeed-macro
+    runs-on: codspeed-macro
     strategy:
       fail-fast: false
       matrix:
         include:
           # neqo vs neqo: all cc/pacing combinations
-          - {client: neqo,   server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: neqo,   cubic: true,  pacing: false}
-          - {client: neqo,   server: neqo,   cubic: false, pacing: true}
-          - {client: neqo,   server: neqo,   cubic: false, pacing: false}
+          - { client: neqo, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: neqo, cubic: true, pacing: false }
+          - { client: neqo, server: neqo, cubic: false, pacing: true }
+          - { client: neqo, server: neqo, cubic: false, pacing: false }
           # Same-implementation baselines (cubic/pacing not applicable)
-          - {client: msquic, server: msquic}
-          - {client: google, server: google}
-          - {client: quiche, server: quiche}
-          - {client: s2n,    server: s2n}
+          - { client: msquic, server: msquic }
+          - { client: google, server: google }
+          - { client: quiche, server: quiche }
+          - { client: s2n, server: s2n }
           # neqo vs others
-          - {client: neqo,   server: msquic, cubic: true,  pacing: true}
-          - {client: msquic, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: google, cubic: true,  pacing: true}
-          - {client: google, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: quiche, cubic: true,  pacing: true}
-          - {client: quiche, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: s2n,    cubic: true,  pacing: true}
-          - {client: s2n,    server: neqo,   cubic: true,  pacing: true}
+          - { client: neqo, server: msquic, cubic: true, pacing: true }
+          - { client: msquic, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: google, cubic: true, pacing: true }
+          - { client: google, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: quiche, cubic: true, pacing: true }
+          - { client: quiche, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: s2n, cubic: true, pacing: true }
+          - { client: s2n, server: neqo, cubic: true, pacing: true }
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -302,7 +220,7 @@ jobs:
         uses: ./.github/actions/testdata-setup
         with:
           sizes: ${{ env.TRANSFER_SIZE }}
-          mtu: '1500'
+          mtu: "1500"
 
       - name: Set environment
         run: |
@@ -376,4 +294,3 @@ jobs:
       - name: Stop server
         if: always()
         run: kill "$SERVER_PID" 2>/dev/null || true
-
