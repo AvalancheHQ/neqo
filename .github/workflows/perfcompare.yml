@@ -86,60 +86,60 @@ jobs:
         run: |
           echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
 
-      - name: Install Rust
-        uses: ./neqo/.github/actions/rust
-        with:
-          version: ${{ env.RUSTUP_TOOLCHAIN }}
-          tools: hyperfine, flamegraph, samply
-          token: ${{ secrets.GITHUB_TOKEN }}
-          workspaces: |
-            neqo
-            quiche
-            s2n-quic
-
-      - name: Get minimum NSS version
-        id: nss-version
-        run: |
-          cd neqo
-          cat neqo-crypto/min_version.txt > versions.txt
-          git show origin/main:neqo-crypto/min_version.txt >> versions.txt
-          # Use the maximum version from both branches.
-          echo "minimum=$(sort -u versions.txt | tail -n1)" >> "$GITHUB_OUTPUT"
-
-      - name: Install NSS
-        id: nss
-        uses: ./neqo/.github/actions/nss
-        with:
-          minimum-version: ${{ steps.nss-version.outputs.minimum }}
-
-      - name: Build neqo
-        run: |
-          # See https://github.com/flamegraph-rs/flamegraph for why we append to RUSTFLAGS here.
-          export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld -C link-arg=-Wl,--no-rosegment -C force-frame-pointers=yes $RUSTFLAGS"
-          echo "RUSTFLAGS=$RUSTFLAGS" >> "$GITHUB_ENV"
-          mkdir -p binaries/neqo-main
-          mkdir -p binaries/neqo
-          cd neqo
-          git checkout origin/main
-          cargo build --locked --release --features bench --bin neqo-client --bin neqo-server
-          cp target/release/neqo-client ../binaries/neqo-main/
-          cp target/release/neqo-server ../binaries/neqo-main/
-          git checkout -
-          cargo build --locked --release --features bench --bin neqo-client --bin neqo-server
-          cp target/release/neqo-client ../binaries/neqo/
-          cp target/release/neqo-server ../binaries/neqo/
-
-      - name: Build msquic
-        run: |
-          mkdir -p msquic/build
-          cd msquic/build
-          rm -f CMakeCache.txt # This seems to be needed now to avoid a spurious warning about "QUIC_TLS"...
-          cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUIC_BUILD_TOOLS=1 -DQUIC_BUILD_PERF=1 -DQUIC_OPTIMIZE_LOCAL=1 -DQUIC_HIGH_RES_TIMERS=1 ..
-          cmake --build .
+      # - name: Install Rust
+      #   uses: ./neqo/.github/actions/rust
+      #   with:
+      #     version: ${{ env.RUSTUP_TOOLCHAIN }}
+      #     tools: hyperfine, flamegraph, samply
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     workspaces: |
+      #       neqo
+      #       quiche
+      #       s2n-quic
+      #
+      # - name: Get minimum NSS version
+      #   id: nss-version
+      #   run: |
+      #     cd neqo
+      #     cat neqo-crypto/min_version.txt > versions.txt
+      #     git show origin/main:neqo-crypto/min_version.txt >> versions.txt
+      #     # Use the maximum version from both branches.
+      #     echo "minimum=$(sort -u versions.txt | tail -n1)" >> "$GITHUB_OUTPUT"
+      #
+      # - name: Install NSS
+      #   id: nss
+      #   uses: ./neqo/.github/actions/nss
+      #   with:
+      #     minimum-version: ${{ steps.nss-version.outputs.minimum }}
+      #
+      # - name: Build neqo
+      #   run: |
+      #     # See https://github.com/flamegraph-rs/flamegraph for why we append to RUSTFLAGS here.
+      #     export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld -C link-arg=-Wl,--no-rosegment -C force-frame-pointers=yes $RUSTFLAGS"
+      #     echo "RUSTFLAGS=$RUSTFLAGS" >> "$GITHUB_ENV"
+      #     mkdir -p binaries/neqo-main
+      #     mkdir -p binaries/neqo
+      #     cd neqo
+      #     git checkout origin/main
+      #     cargo build --locked --release --features bench --bin neqo-client --bin neqo-server
+      #     cp target/release/neqo-client ../binaries/neqo-main/
+      #     cp target/release/neqo-server ../binaries/neqo-main/
+      #     git checkout -
+      #     cargo build --locked --release --features bench --bin neqo-client --bin neqo-server
+      #     cp target/release/neqo-client ../binaries/neqo/
+      #     cp target/release/neqo-server ../binaries/neqo/
+      #
+      # - name: Build msquic
+      #   run: |
+      #     mkdir -p msquic/build
+      #     cd msquic/build
+      #     rm -f CMakeCache.txt # This seems to be needed now to avoid a spurious warning about "QUIC_TLS"...
+      #     cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUIC_BUILD_TOOLS=1 -DQUIC_BUILD_PERF=1 -DQUIC_OPTIMIZE_LOCAL=1 -DQUIC_HIGH_RES_TIMERS=1 ..
+      #     cmake --build .
 
       - name: Install Bazel 7.0.0
         run: |
-          curl -L https://github.com/bazelbuild/bazel/releases/download/7.0.0/bazel-7.0.0-linux-x86_64 -o /usr/local/bin/bazel-7.0.0                              
+          curl -L https://github.com/bazelbuild/bazel/releases/download/7.0.0/bazel-7.0.0-linux-arm64 -o /usr/local/bin/bazel-7.0.0                               
           chmod +x /usr/local/bin/bazel-7.0.0
 
       - name: Build google/quiche
