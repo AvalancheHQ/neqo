@@ -22,9 +22,71 @@ permissions:
   contents: read
 
 jobs:
+  # Build jobs for QUIC implementations (reusing quic-build action)
+  build-msquic:
+    name: Build msquic
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+
+      - uses: ./.github/actions/quic-build
+        with:
+          impl: msquic
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifact-name: perfcompare-msquic
+
+  build-google:
+    name: Build google/quiche
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+
+      - uses: ./.github/actions/quic-build
+        with:
+          impl: google
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifact-name: perfcompare-google
+
+  build-quiche:
+    name: Build cloudflare/quiche
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+
+      - uses: ./.github/actions/quic-build
+        with:
+          impl: quiche
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifact-name: perfcompare-quiche
+
+  build-s2n:
+    name: Build s2n-quic
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+
+      - uses: ./.github/actions/quic-build
+        with:
+          impl: s2n
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifact-name: perfcompare-s2n
+
   perfcompare:
     name: Performance comparison
-    runs-on: 'self-hosted' # zizmor: ignore[self-hosted-runner]
+    needs: [build-msquic, build-google, build-quiche, build-s2n]
+    runs-on: ubuntu-24.04
     defaults:
       run:
         shell: bash
@@ -35,52 +97,58 @@ jobs:
         with:
           repository: mozilla/neqo
           path: neqo
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
       - run: |
           cd neqo
           git fetch --no-tags --depth=1 origin main
 
-      - name: Checkout microsoft/msquic
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Download msquic binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          repository: microsoft/msquic
-          ref: v2.5.6
-          path: msquic
-          submodules: 'recursive'
-          persist-credentials: false
-          clean: false
+          name: perfcompare-msquic
+          path: msquic-binaries
 
-      - name: Checkout google/quiche
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Download google/quiche binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          repository: google/quiche
-          ref: c52d86fe10442363e4e8c5a66e639187c419d7c0 # Google doesn't tag release, just update the hash occasionally
-          path: google-quiche
-          submodules: 'recursive'
-          persist-credentials: false
-          clean: false
+          name: perfcompare-google
+          path: google-binaries
 
-      - name: Checkout cloudflare/quiche
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Download cloudflare/quiche binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          repository: cloudflare/quiche
-          ref: 0.24.5
-          path: quiche
-          submodules: 'recursive'
-          persist-credentials: false
-          clean: false
+          name: perfcompare-quiche
+          path: quiche-binaries
 
-      - name: Checkout aws/s2n-quic
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Download s2n-quic binaries
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          repository: aws/s2n-quic
-          ref: v1.72.0
-          path: s2n-quic
-          submodules: 'recursive'
-          persist-credentials: false
-          clean: false
+          name: perfcompare-s2n
+          path: s2n-binaries
+
+      - name: Setup binary paths for perfcompare.py
+        run: |
+          # Create directory structure expected by perfcompare.py
+          mkdir -p msquic/build/bin/Release
+          cp msquic-binaries/quicinterop msquic/build/bin/Release/
+          cp msquic-binaries/quicinteropserver msquic/build/bin/Release/
+          chmod +x msquic/build/bin/Release/*
+
+          mkdir -p google-quiche/bazel-bin/quiche
+          cp google-binaries/quic_server google-quiche/bazel-bin/quiche/
+          cp google-binaries/quic_client google-quiche/bazel-bin/quiche/
+          chmod +x google-quiche/bazel-bin/quiche/*
+
+          mkdir -p quiche/target/release
+          cp quiche-binaries/quiche-client quiche/target/release/
+          cp quiche-binaries/quiche-server quiche/target/release/
+          chmod +x quiche/target/release/*
+
+          mkdir -p s2n-quic/target/release
+          cp s2n-binaries/s2n-quic-qns s2n-quic/target/release/
+          chmod +x s2n-quic/target/release/*
 
       - name: Set PATH and environment
         run: |
@@ -92,10 +160,7 @@ jobs:
           version: ${{ env.RUSTUP_TOOLCHAIN }}
           tools: hyperfine, flamegraph, samply
           token: ${{ secrets.GITHUB_TOKEN }}
-          workspaces: |
-            neqo
-            quiche
-            s2n-quic
+          workspaces: neqo
 
       - name: Get minimum NSS version
         id: nss-version
@@ -129,38 +194,12 @@ jobs:
           cp target/release/neqo-client ../binaries/neqo/
           cp target/release/neqo-server ../binaries/neqo/
 
-      - name: Build msquic
-        run: |
-          mkdir -p msquic/build
-          cd msquic/build
-          rm -f CMakeCache.txt # This seems to be needed now to avoid a spurious warning about "QUIC_TLS"...
-          cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUIC_BUILD_TOOLS=1 -DQUIC_BUILD_PERF=1 -DQUIC_OPTIMIZE_LOCAL=1 -DQUIC_HIGH_RES_TIMERS=1 ..
-          cmake --build .
-
-      - name: Build google/quiche
-        run: |
-          cd google-quiche
-          bazel-7.0.0 build -c opt --copt=-fno-omit-frame-pointer --copt=-g --strip=never --sandbox_writable_path="$HOME/.cache/sccache" quiche:quic_server quiche:quic_client
-          bazel-7.0.0 shutdown
-
-      - name: Build cloudflare/quiche
-        run: |
-          # We already changed RUSTFLAGS above; this depends on that having happened.
-          cd quiche
-          cargo build --release --bin quiche-client --bin quiche-server # --locked not working
-
-      - name: Build aws/s2n-quic
-        run: |
-          # We already changed RUSTFLAGS above; this depends on that having happened.
-          cd s2n-quic
-          cargo build --release --bin s2n-quic-qns # --locked not working
-
       # Disable turboboost, hyperthreading and use performance governor.
       # Also creates "cpu23", "cpu2" and "cpu3" CPU sets for use with cset.
       # On the bencher, logical cores 2 and 3 have been isolated for use by the benchmarks.
       - name: Prepare machine
         run: |
-          sudo /root/bin/prep.sh
+          # sudo /root/bin/prep.sh
           # See https://github.com/microsoft/msquic/issues/4618#issuecomment-2422611592
           sudo ip link set dev lo mtu "$MTU"
 
@@ -183,7 +222,7 @@ jobs:
       - name: Restore machine
         if: success() || failure() || cancelled()
         run: |
-          sudo /root/bin/unprep.sh
+          # sudo /root/bin/unprep.sh
           # In case the previous test failed:
           sudo ip link set dev lo mtu 65536
 
@@ -200,7 +239,7 @@ jobs:
         id: results
         env:
           EVENT_PATH: ${{ github.event_path }}
-          TESTBED: 'On-prem'
+          TESTBED: "On-prem"
         run: |
           SHA=$(cd neqo && git log origin/main -1 --format=%H)
           echo "$SHA" > main-sha.txt
