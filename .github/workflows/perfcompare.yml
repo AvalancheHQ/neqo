@@ -222,7 +222,7 @@ jobs:
       - name: Restore machine
         if: success() || failure() || cancelled()
         run: |
-          sudo /root/bin/unprep.sh
+          # sudo /root/bin/unprep.sh
           # In case the previous test failed:
           sudo ip link set dev lo mtu 65536
 
