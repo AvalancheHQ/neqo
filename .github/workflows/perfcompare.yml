@@ -199,7 +199,7 @@ jobs:
       # On the bencher, logical cores 2 and 3 have been isolated for use by the benchmarks.
       - name: Prepare machine
         run: |
-          sudo /root/bin/prep.sh
+          # sudo /root/bin/prep.sh
           # See https://github.com/microsoft/msquic/issues/4618#issuecomment-2422611592
           sudo ip link set dev lo mtu "$MTU"
 
