@@ -44,7 +44,7 @@ jobs:
   # Using ubuntu-22.04 for glibc compatibility with CodSpeed runners.
   build-neqo:
     name: Build neqo
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04
     needs: bench-matrix
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -102,7 +102,7 @@ jobs:
 
   build-msquic:
     name: Build msquic
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -117,7 +117,7 @@ jobs:
 
   build-google:
     name: Build google/quiche
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -132,7 +132,7 @@ jobs:
 
   build-quiche:
     name: Build cloudflare/quiche
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -147,7 +147,7 @@ jobs:
 
   build-s2n:
     name: Build s2n-quic
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -163,7 +163,7 @@ jobs:
   perfcompare:
     name: ${{ matrix.client }}-${{ matrix.server }}${{ matrix.cubic && '-cubic' || '' }}${{ matrix.pacing == false && '-nopacing' || '' }}
     needs: [build-neqo, build-msquic, build-google, build-quiche, build-s2n]
-    runs-on: codspeed-macro
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
