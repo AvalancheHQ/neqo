@@ -137,6 +137,11 @@ jobs:
           cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUIC_BUILD_TOOLS=1 -DQUIC_BUILD_PERF=1 -DQUIC_OPTIMIZE_LOCAL=1 -DQUIC_HIGH_RES_TIMERS=1 ..
           cmake --build .
 
+      - name: Install Bazel 7.0.0
+        run: |
+          curl -L https://github.com/bazelbuild/bazel/releases/download/7.0.0/bazel-7.0.0-linux-x86_64 -o /usr/local/bin/bazel-7.0.0                              
+          chmod +x /usr/local/bin/bazel-7.0.0
+
       - name: Build google/quiche
         run: |
           cd google-quiche
