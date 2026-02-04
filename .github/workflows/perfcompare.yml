@@ -30,27 +30,27 @@ jobs:
         shell: bash
 
     steps:
-      - name: Checkout mozilla/neqo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: mozilla/neqo
-          path: neqo
-          submodules: "recursive"
-          persist-credentials: false
-          clean: false
-      - run: |
-          cd neqo
-          git fetch --no-tags --depth=1 origin main
-
-      - name: Checkout microsoft/msquic
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: microsoft/msquic
-          ref: v2.5.6
-          path: msquic
-          submodules: "recursive"
-          persist-credentials: false
-          clean: false
+      # - name: Checkout mozilla/neqo
+      #   uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      #   with:
+      #     repository: mozilla/neqo
+      #     path: neqo
+      #     submodules: "recursive"
+      #     persist-credentials: false
+      #     clean: false
+      # - run: |
+      #     cd neqo
+      #     git fetch --no-tags --depth=1 origin main
+      #
+      # - name: Checkout microsoft/msquic
+      #   uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      #   with:
+      #     repository: microsoft/msquic
+      #     ref: v2.5.6
+      #     path: msquic
+      #     submodules: "recursive"
+      #     persist-credentials: false
+      #     clean: false
 
       - name: Checkout google/quiche
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -62,25 +62,25 @@ jobs:
           persist-credentials: false
           clean: false
 
-      - name: Checkout cloudflare/quiche
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: cloudflare/quiche
-          ref: 0.24.5
-          path: quiche
-          submodules: "recursive"
-          persist-credentials: false
-          clean: false
-
-      - name: Checkout aws/s2n-quic
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: aws/s2n-quic
-          ref: v1.72.0
-          path: s2n-quic
-          submodules: "recursive"
-          persist-credentials: false
-          clean: false
+      # - name: Checkout cloudflare/quiche
+      #   uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      #   with:
+      #     repository: cloudflare/quiche
+      #     ref: 0.24.5
+      #     path: quiche
+      #     submodules: "recursive"
+      #     persist-credentials: false
+      #     clean: false
+      #
+      # - name: Checkout aws/s2n-quic
+      #   uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      #   with:
+      #     repository: aws/s2n-quic
+      #     ref: v1.72.0
+      #     path: s2n-quic
+      #     submodules: "recursive"
+      #     persist-credentials: false
+      #     clean: false
 
       - name: Set PATH and environment
         run: |
@@ -145,7 +145,7 @@ jobs:
       - name: Build google/quiche
         run: |
           cd google-quiche
-          bazel-7.0.0 build -c opt --copt=-fno-omit-frame-pointer --copt=-g --strip=never --sandbox_writable_path="$HOME/.cache/sccache" quiche:quic_server quiche:quic_client
+          bazel-7.0.0 build -c opt --copt=-fno-omit-frame-pointer --copt=-g --strip=never quiche:quic_server quiche:quic_client
           bazel-7.0.0 shutdown
 
       - name: Build cloudflare/quiche
