@@ -11,7 +11,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTUP_TOOLCHAIN: stable
   # Performance comparison settings
-  TRANSFER_SIZE: 33554432  # 32 MiB
+  TRANSFER_SIZE: 33554432 # 32 MiB
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -19,6 +19,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 defaults:
   run:
@@ -199,7 +200,6 @@ jobs:
   benchmarks-walltime:
     name: Run ${{ matrix.bench.bench }} (walltime)
     runs-on: # zizmor: ignore[self-hosted-runner]
-      group: codspeed
       labels: codspeed-macro
     needs: [bench-matrix, build-neqo]
     if: ${{ needs.bench-matrix.outputs.has-walltime == 'true' }}
@@ -289,31 +289,30 @@ jobs:
     name: ${{ matrix.client }}-${{ matrix.server }}${{ matrix.cubic && '-cubic' || '' }}${{ matrix.pacing == false && '-nopacing' || '' }}
     needs: [build-neqo, build-msquic, build-google, build-quiche, build-s2n]
     runs-on: # zizmor: ignore[self-hosted-runner]
-      group: codspeed
       labels: codspeed-macro
     strategy:
       fail-fast: false
       matrix:
         include:
           # neqo vs neqo: all cc/pacing combinations
-          - {client: neqo,   server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: neqo,   cubic: true,  pacing: false}
-          - {client: neqo,   server: neqo,   cubic: false, pacing: true}
-          - {client: neqo,   server: neqo,   cubic: false, pacing: false}
+          - { client: neqo, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: neqo, cubic: true, pacing: false }
+          - { client: neqo, server: neqo, cubic: false, pacing: true }
+          - { client: neqo, server: neqo, cubic: false, pacing: false }
           # Same-implementation baselines (cubic/pacing not applicable)
-          - {client: msquic, server: msquic}
-          - {client: google, server: google}
-          - {client: quiche, server: quiche}
-          - {client: s2n,    server: s2n}
+          - { client: msquic, server: msquic }
+          - { client: google, server: google }
+          - { client: quiche, server: quiche }
+          - { client: s2n, server: s2n }
           # neqo vs others
-          - {client: neqo,   server: msquic, cubic: true,  pacing: true}
-          - {client: msquic, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: google, cubic: true,  pacing: true}
-          - {client: google, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: quiche, cubic: true,  pacing: true}
-          - {client: quiche, server: neqo,   cubic: true,  pacing: true}
-          - {client: neqo,   server: s2n,    cubic: true,  pacing: true}
-          - {client: s2n,    server: neqo,   cubic: true,  pacing: true}
+          - { client: neqo, server: msquic, cubic: true, pacing: true }
+          - { client: msquic, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: google, cubic: true, pacing: true }
+          - { client: google, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: quiche, cubic: true, pacing: true }
+          - { client: quiche, server: neqo, cubic: true, pacing: true }
+          - { client: neqo, server: s2n, cubic: true, pacing: true }
+          - { client: s2n, server: neqo, cubic: true, pacing: true }
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -347,7 +346,7 @@ jobs:
         uses: ./.github/actions/testdata-setup
         with:
           sizes: ${{ env.TRANSFER_SIZE }}
-          mtu: '1500'
+          mtu: "1500"
 
       - name: Set environment
         run: |
@@ -496,7 +495,8 @@ jobs:
         with:
           mode: walltime
           working-directory: /tmp
-          token: ${{ secrets.CODSPEED_TOKEN }}
+          runner-version: branch:cod-2138-deduplicate-perf-maps-and-unwind_data
+          upload-url: ${{ secrets.DEV_GUILLAUME_CODSPEED_UPLOAD_URL }}
 
       - name: Verify transfer
         working-directory: /tmp
@@ -510,4 +510,3 @@ jobs:
       - name: Stop server
         if: always()
         run: kill "$SERVER_PID" 2>/dev/null || true
-
