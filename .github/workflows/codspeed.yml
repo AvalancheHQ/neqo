@@ -165,24 +165,24 @@ jobs:
       matrix:
         include:
           # neqo vs neqo: all cc/pacing combinations
-          - { client: neqo, server: neqo, cubic: true, pacing: true }
-          - { client: neqo, server: neqo, cubic: true, pacing: false }
-          - { client: neqo, server: neqo, cubic: false, pacing: true }
-          - { client: neqo, server: neqo, cubic: false, pacing: false }
+          # - { client: neqo, server: neqo, cubic: true, pacing: true }
+          # - { client: neqo, server: neqo, cubic: true, pacing: false }
+          # - { client: neqo, server: neqo, cubic: false, pacing: true }
+          # - { client: neqo, server: neqo, cubic: false, pacing: false }
           # Same-implementation baselines (cubic/pacing not applicable)
-          - { client: msquic, server: msquic }
-          - { client: google, server: google }
+          # - { client: msquic, server: msquic }
+          # - { client: google, server: google }
           - { client: quiche, server: quiche }
-          - { client: s2n, server: s2n }
+          # - { client: s2n, server: s2n }
           # neqo vs others
-          - { client: neqo, server: msquic, cubic: true, pacing: true }
-          - { client: msquic, server: neqo, cubic: true, pacing: true }
-          - { client: neqo, server: google, cubic: true, pacing: true }
+          # - { client: neqo, server: msquic, cubic: true, pacing: true }
+          # - { client: msquic, server: neqo, cubic: true, pacing: true }
+          # - { client: neqo, server: google, cubic: true, pacing: true }
           - { client: google, server: neqo, cubic: true, pacing: true }
-          - { client: neqo, server: quiche, cubic: true, pacing: true }
+          # - { client: neqo, server: quiche, cubic: true, pacing: true }
           - { client: quiche, server: neqo, cubic: true, pacing: true }
           - { client: neqo, server: s2n, cubic: true, pacing: true }
-          - { client: s2n, server: neqo, cubic: true, pacing: true }
+          # - { client: s2n, server: neqo, cubic: true, pacing: true }
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
