@@ -286,12 +286,14 @@ jobs:
             echo "      min-rounds: 75"
           } > codspeed.yml
 
+      - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness
+
       - name: Run benchmark
         uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
         with:
           mode: walltime
           working-directory: /tmp
-          runner-version: branch:cod-2138-deduplicate-perf-maps-and-unwind_data
+          runner-version: branch:cod-2233-investigate-neqo-variance
           upload-url: ${{ secrets.DEV_GUILLAUME_CODSPEED_UPLOAD_URL }}
           config: ${{ github.workspace }}/codspeed.yml
 
