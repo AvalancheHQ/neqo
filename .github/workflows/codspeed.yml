@@ -54,6 +54,8 @@ jobs:
           tools: cargo-codspeed
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: Swatinem/rust-cache@v2
+
       - uses: ./.github/actions/nss
 
       - name: Build neqo binaries
@@ -181,7 +183,7 @@ jobs:
           - { client: google, server: neqo, cubic: true, pacing: true }
           # - { client: neqo, server: quiche, cubic: true, pacing: true }
           - { client: quiche, server: neqo, cubic: true, pacing: true }
-          - { client: neqo, server: s2n, cubic: true, pacing: true }
+          # - { client: neqo, server: s2n, cubic: true, pacing: true }
           # - { client: s2n, server: neqo, cubic: true, pacing: true }
 
     steps:
@@ -283,8 +285,10 @@ jobs:
             echo "  - name: \"$BENCH_NAME\""
             echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
-            echo "      min-rounds: 75"
+            echo "      min-rounds: 100"
           } > codspeed.yml
+
+      - uses: Swatinem/rust-cache@v2
 
       - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness
 
