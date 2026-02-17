@@ -181,7 +181,8 @@ runs:
         NSS_DIR: ${{ github.workspace }}/nss
         RUNNER_OS: ${{ runner.os }}
         WORKSPACE: ${{ github.workspace }}
-      run: | # zizmor: ignore[github-env] We need to write to GITHUB_PATH on Windows.
+      run:
+        | # zizmor: ignore[github-env] We need to write to GITHUB_PATH on Windows.
         NSS_OUT="$WORKSPACE/dist/Release"
         {
           echo "LD_LIBRARY_PATH=$NSS_OUT/lib"
@@ -243,7 +244,6 @@ runs:
         fi
 
     - name: Save NSS cache
-      if: ${{ steps.check_build.outputs.build_nss && github.event_name != 'pull_request' }}
       uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: dist
