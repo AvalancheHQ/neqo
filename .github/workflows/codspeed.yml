@@ -336,7 +336,7 @@ jobs:
             echo "CLIENT_CPU=$CLIENT_CPU"
           } >> "$GITHUB_ENV"
 
-      - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness
+      - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness --force
 
       # --- quiche vs quiche ---
       - name: Generate commands (quiche-quiche)
