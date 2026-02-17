@@ -91,7 +91,7 @@ fn perfcompare(c: &mut Criterion) {
         let server = start_server(&server_cmd);
 
         // 2. Benchmark: run the client command.
-        group.bench_function(bench.name, |b| {
+        group.bench_function(format!("criterion-{}", bench.name), |b| {
             b.iter(|| {
                 let status = Command::new("sh")
                     .args(["-c", &client_cmd])
