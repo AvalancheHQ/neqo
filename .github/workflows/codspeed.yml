@@ -264,8 +264,7 @@ jobs:
           run: |
             cargo binstall cargo-codspeed --locked --force
             cargo codspeed run -p neqo-bench
-          runner-version: branch:cod-2233-investigate-neqo-variance
-          upload-url: ${{ secrets.DEV_GUILLAUME_CODSPEED_UPLOAD_URL }}
+          upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
 
   perfcompare:
     name: Performance comparison
@@ -383,8 +382,7 @@ jobs:
         with:
           mode: walltime
           working-directory: /tmp
-          runner-version: branch:cod-2233-investigate-neqo-variance
-          upload-url: ${{ secrets.DEV_GUILLAUME_CODSPEED_UPLOAD_URL }}
+          upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
           config: ${{ github.workspace }}/codspeed.yml
 
       - name: Stop server (quiche-quiche)
@@ -436,11 +434,12 @@ jobs:
 
       - name: Run benchmark (google-neqo)
         uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
+        env:
+          CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
           working-directory: /tmp
-          runner-version: branch:cod-2233-investigate-neqo-variance
-          upload-url: ${{ secrets.DEV_GUILLAUME_CODSPEED_UPLOAD_URL }}
+          upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
           config: ${{ github.workspace }}/codspeed.yml
 
       - name: Stop server (google-neqo)
@@ -495,8 +494,7 @@ jobs:
         with:
           mode: walltime
           working-directory: /tmp
-          runner-version: branch:cod-2233-investigate-neqo-variance
-          upload-url: ${{ secrets.DEV_GUILLAUME_CODSPEED_UPLOAD_URL }}
+          upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
           config: ${{ github.workspace }}/codspeed.yml
 
       - name: Stop server (quiche-neqo)
