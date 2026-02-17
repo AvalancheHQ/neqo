@@ -73,8 +73,9 @@ runs:
     # shared-key (6 entries: 3 OS × 2 toolchains). Only saves on main for
     # stable/MSRV; nightly changes too frequently.
     - name: Enable Rust cache
-      if: ${{ runner.environment == 'github-hosted' }}
       uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      with:
+        shared-key: ${{ runner.os }}-${{ inputs.version }} # Dirty but we are just iterating
       # with:
       #   cache-bin: false  # Using binstall for tools
       #   cache-all-crates: false

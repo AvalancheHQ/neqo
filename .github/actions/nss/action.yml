@@ -33,37 +33,6 @@ runs:
           exit 1
         fi
 
-    - name: Install system NSS (Linux)
-      shell: bash
-      if: ${{ runner.os == 'Linux' && inputs.target == '' && (runner.environment != 'self-hosted' || contains(runner.name, 'CodSpeed')) }}
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        [ "$APT_UPDATED" ] || sudo apt-get update && echo "APT_UPDATED=1" >> "$GITHUB_ENV"
-        sudo apt-get install -y --no-install-recommends libnss3-dev
-
-    - name: Install system NSS (MacOS)
-      shell: bash
-      if: ${{ runner.os == 'MacOS' && inputs.target == '' }}
-      run: |
-        [ "$BREW_UPDATED" ] || brew update && echo "BREW_UPDATED=1" >> "$GITHUB_ENV"
-        brew install nss
-
-    - name: Check system NSS version
-      id: system_nss
-      env:
-        MIN_VERSION: ${{ steps.min-version.outputs.minimum }}
-      shell: bash
-      if: inputs.target == ''
-      run: |
-        if ! pkg-config --atleast-version "$MIN_VERSION" nss; then
-          echo -n "System NSS needs ${MIN_VERSION}, got "
-          pkg-config --modversion nss 2>/dev/null || echo "pkg-config error"
-          exit 0
-        fi
-        echo "System NSS is suitable: $NSS_VERSION"
-        echo "suitable=1" >> "$GITHUB_OUTPUT"
-
     - name: Use sccache
       # Apparently the action can't be installed twice in the same workflow, so check if
       # it's already installed by checking if the SCCACHE_ENABLED environment variable is set
@@ -71,11 +40,11 @@ runs:
       #
       # Also, only enable sscache on our self-hosted runner, because the GitHub cache limit
       # is too small for this to be effective there.
-      if: ${{ env.SCCACHE_ENABLED != '1' && !steps.system_nss.outputs.suitable && runner.environment == 'self-hosted' && !contains(runner.name, 'CodSpeed') }}
+      if: ${{ env.SCCACHE_ENABLED != '1' && runner.environment == 'self-hosted' && !contains(runner.name, 'CodSpeed') }}
       uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
 
     - name: Enable sscache
-      if: ${{ !steps.system_nss.outputs.suitable && runner.environment == 'self-hosted' && !contains(runner.name, 'CodSpeed') }}
+      if: ${{ runner.environment == 'self-hosted' && !contains(runner.name, 'CodSpeed') }}
       env:
         RUNNER_ENVIRONMENT: ${{ runner.environment }}
         RUNNER_OS: ${{ runner.os }}
@@ -93,7 +62,6 @@ runs:
 
     - name: Retrieve NSS
       id: nss
-      if: ${{ !steps.system_nss.outputs.suitable }}
       shell: bash
       run: |
         # Versions and checksums are defined in nss-versions.env next to this action.
@@ -113,7 +81,6 @@ runs:
 
     - name: Retrieve NSPR
       id: nspr
-      if: ${{ !steps.system_nss.outputs.suitable }}
       shell: bash
       run: |
         # Versions and checksums are defined in nss-versions.env next to this action.
@@ -133,7 +100,7 @@ runs:
     - name: Store Ubuntu release code name (Linux)
       id: ubuntu_release
       shell: bash
-      if: ${{ runner.os == 'Linux' && !steps.system_nss.outputs.suitable }}
+      if: ${{ runner.os == 'Linux' }}
       run: |
         # Store Ubuntu release codename for use in cache key.
         . /etc/os-release
@@ -144,7 +111,6 @@ runs:
     # Downside: PRs that change NSS version/build will rebuild on every CI run.
     - name: Restore NSS cache
       id: cache
-      if: ${{ !steps.system_nss.outputs.suitable }}
       uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: dist
@@ -152,7 +118,6 @@ runs:
 
     - name: Check if build is needed
       id: check_build
-      if: ${{ !steps.system_nss.outputs.suitable }}
       env:
         CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
       shell: bash
@@ -212,7 +177,6 @@ runs:
 
     - name: Set up environment
       shell: bash
-      if: ${{ !steps.system_nss.outputs.suitable }}
       env:
         NSS_DIR: ${{ github.workspace }}/nss
         RUNNER_OS: ${{ runner.os }}
