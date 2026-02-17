@@ -780,6 +780,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "neqo-bench"
+version = "0.22.2"
+dependencies = [
+ "codspeed-criterion-compat",
+]
+
+[[package]]
 name = "neqo-bin"
 version = "0.22.2"
 dependencies = [
