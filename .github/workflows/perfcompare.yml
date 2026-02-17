@@ -24,7 +24,7 @@ permissions:
 jobs:
   perfcompare:
     name: Performance comparison
-    runs-on: 'self-hosted' # zizmor: ignore[self-hosted-runner]
+    runs-on: "codspeed-macro" # zizmor: ignore[self-hosted-runner]
     defaults:
       run:
         shell: bash
@@ -35,7 +35,7 @@ jobs:
         with:
           repository: mozilla/neqo
           path: neqo
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
       - run: |
@@ -48,7 +48,7 @@ jobs:
           repository: microsoft/msquic
           ref: v2.5.6
           path: msquic
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -58,7 +58,7 @@ jobs:
           repository: google/quiche
           ref: c52d86fe10442363e4e8c5a66e639187c419d7c0 # Google doesn't tag release, just update the hash occasionally
           path: google-quiche
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -68,7 +68,7 @@ jobs:
           repository: cloudflare/quiche
           ref: 0.24.5
           path: quiche
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -78,7 +78,7 @@ jobs:
           repository: aws/s2n-quic
           ref: v1.72.0
           path: s2n-quic
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -200,7 +200,7 @@ jobs:
         id: results
         env:
           EVENT_PATH: ${{ github.event_path }}
-          TESTBED: 'On-prem'
+          TESTBED: "On-prem"
         run: |
           SHA=$(cd neqo && git log origin/main -1 --format=%H)
           echo "$SHA" > main-sha.txt
