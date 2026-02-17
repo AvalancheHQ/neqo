@@ -160,7 +160,18 @@ jobs:
       # On the bencher, logical cores 2 and 3 have been isolated for use by the benchmarks.
       - name: Prepare machine
         run: |
-          # sudo /root/bin/prep.sh
+          # Create cpusets for pinning server (cpu2 -> CPU 14) and client (cpu3 -> CPU 15)
+          sudo mkdir -p /cpusets
+          sudo mount -t cgroup -o cpuset cpuset /cpusets 2>/dev/null || true
+          sudo mkdir -p /cpusets/cpu23
+          echo 14-15 | sudo tee /cpusets/cpu23/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu23/cpuset.mems
+          sudo mkdir -p /cpusets/cpu2
+          echo 14 | sudo tee /cpusets/cpu2/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu2/cpuset.mems
+          sudo mkdir -p /cpusets/cpu3
+          echo 15 | sudo tee /cpusets/cpu3/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu3/cpuset.mems
           # See https://github.com/microsoft/msquic/issues/4618#issuecomment-2422611592
           sudo ip link set dev lo mtu "$MTU"
 
