@@ -20,6 +20,9 @@ inputs:
   workspaces:
     description: Newline-separated list of workspaces
     required: false
+  cache-key-suffix:
+    description: "Additional suffix to append to the cache shared-key"
+    default: ""
 
 runs:
   using: composite
@@ -75,7 +78,7 @@ runs:
     - name: Enable Rust cache
       uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       with:
-        shared-key: ${{ runner.os }}-${{ inputs.version }} # Dirty but we are just iterating
+        shared-key: ${{ runner.os }}-${{ inputs.version }}${{ inputs.cache-key-suffix }} # Dirty but we are just iterating
       # with:
       #   cache-bin: false  # Using binstall for tools
       #   cache-all-crates: false
