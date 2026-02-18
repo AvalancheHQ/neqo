@@ -24,7 +24,7 @@ permissions:
 jobs:
   perfcompare:
     name: Performance comparison
-    runs-on: 'self-hosted' # zizmor: ignore[self-hosted-runner]
+    runs-on: "codspeed-macro" # zizmor: ignore[self-hosted-runner]
     defaults:
       run:
         shell: bash
@@ -35,7 +35,7 @@ jobs:
         with:
           repository: mozilla/neqo
           path: neqo
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
       - run: |
@@ -48,7 +48,7 @@ jobs:
           repository: microsoft/msquic
           ref: v2.5.6
           path: msquic
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -58,7 +58,7 @@ jobs:
           repository: google/quiche
           ref: c52d86fe10442363e4e8c5a66e639187c419d7c0 # Google doesn't tag release, just update the hash occasionally
           path: google-quiche
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -68,7 +68,7 @@ jobs:
           repository: cloudflare/quiche
           ref: 0.24.5
           path: quiche
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -78,7 +78,7 @@ jobs:
           repository: aws/s2n-quic
           ref: v1.72.0
           path: s2n-quic
-          submodules: 'recursive'
+          submodules: "recursive"
           persist-credentials: false
           clean: false
 
@@ -140,8 +140,15 @@ jobs:
       - name: Build google/quiche
         run: |
           cd google-quiche
-          bazel-7.0.0 build -c opt --copt=-fno-omit-frame-pointer --copt=-g --strip=never --sandbox_writable_path="$HOME/.cache/sccache" quiche:quic_server quiche:quic_client
-          bazel-7.0.0 shutdown
+          # Install bazelisk if not present
+          if ! command -v bazel &> /dev/null; then
+            ARCH=$([[ "$(uname -m)" == "aarch64" ]] && echo "arm64" || echo "amd64")
+            sudo curl -fsSL -o /usr/local/bin/bazel \
+              "https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-$ARCH"
+            sudo chmod +x /usr/local/bin/bazel
+          fi
+          bazel build -c opt --copt=-fno-omit-frame-pointer --copt=-g --strip=never quiche:quic_server quiche:quic_client
+          bazel shutdown
 
       - name: Build cloudflare/quiche
         run: |
@@ -160,7 +167,18 @@ jobs:
       # On the bencher, logical cores 2 and 3 have been isolated for use by the benchmarks.
       - name: Prepare machine
         run: |
-          sudo /root/bin/prep.sh
+          # Create cpusets for pinning server (cpu2 -> CPU 14) and client (cpu3 -> CPU 15)
+          sudo mkdir -p /cpusets
+          sudo mount -t cgroup -o cpuset cpuset /cpusets 2>/dev/null || true
+          sudo mkdir -p /cpusets/cpu23
+          echo 14-15 | sudo tee /cpusets/cpu23/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu23/cpuset.mems
+          sudo mkdir -p /cpusets/cpu2
+          echo 14 | sudo tee /cpusets/cpu2/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu2/cpuset.mems
+          sudo mkdir -p /cpusets/cpu3
+          echo 15 | sudo tee /cpusets/cpu3/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu3/cpuset.mems
           # See https://github.com/microsoft/msquic/issues/4618#issuecomment-2422611592
           sudo ip link set dev lo mtu "$MTU"
 
@@ -183,7 +201,7 @@ jobs:
       - name: Restore machine
         if: success() || failure() || cancelled()
         run: |
-          sudo /root/bin/unprep.sh
+          # sudo /root/bin/unprep.sh
           # In case the previous test failed:
           sudo ip link set dev lo mtu 65536
 
@@ -200,7 +218,7 @@ jobs:
         id: results
         env:
           EVENT_PATH: ${{ github.event_path }}
-          TESTBED: 'On-prem'
+          TESTBED: "On-prem"
         run: |
           SHA=$(cd neqo && git log origin/main -1 --format=%H)
           echo "$SHA" > main-sha.txt
