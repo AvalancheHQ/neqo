@@ -131,7 +131,7 @@ kill_port() {
   # Kill any process already listening on UDP $PORT so re-runs don't fail.
   echo "Clearing UDP port $PORT..."
   local pids
-  pids=$(sudo ss -ulnp | grep ":$PORT " | grep -oP 'pid=\K[0-9]+')
+  pids=$(sudo ss -ulnp | grep ":$PORT " | grep -oP 'pid=\K[0-9]+' || true)
   for pid in $pids; do
     echo "Killing stale process $pid on UDP port $PORT"
     sudo kill "$pid" 2>/dev/null || true
