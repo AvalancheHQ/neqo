@@ -4,15 +4,10 @@ on:
     branches: ["main"]
   workflow_dispatch:
 env:
-  CARGO_PROFILE_BENCH_BUILD_OVERRIDE_DEBUG: true
-  CARGO_PROFILE_RELEASE_DEBUG: true
-  RUSTUP_TOOLCHAIN: stable
   MTU: 1504 # https://github.com/microsoft/msquic/issues/4618
   TRANSFER_SIZE: 33554432 # 32 MiB
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  HOST: 127.0.0.1
+  PORT: 4433
 
 permissions:
   contents: read
@@ -20,49 +15,35 @@ permissions:
 jobs:
   perfcompare:
     name: Performance comparison
-    runs-on: 'self-hosted' # zizmor: ignore[self-hosted-runner]
+    runs-on: "codspeed-macro" # zizmor: ignore[self-hosted-runner]
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: Checkout mozilla/neqo
+      - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: mozilla/neqo
-          path: neqo
           persist-credentials: false
-          clean: false
 
       - name: Set up build artifacts
-        working-directory: neqo
         run: |
-          ARTS="$GITHUB_WORKSPACE/neqo/artifacts"
-          chmod +x "$ARTS"/build-msquic/* "$ARTS"/build-google/* "$ARTS"/build-quiche/* "$ARTS"/build-s2n/*
+          ARTS="$GITHUB_WORKSPACE/artifacts"
+          chmod +x "$ARTS"/build-quiche/* "$ARTS"/build-google/*
           chmod +x "$ARTS/build-neqo/neqo-client" "$ARTS/build-neqo/neqo-server"
 
-          # perfcompare.py expects paths relative to --workspace (neqo/) like:
-          #   binaries/neqo/{neqo-client,neqo-server}   (PR branch)
-          #   binaries/neqo-main/{neqo-client,neqo-server}  (main baseline)
-          #   msquic/build/bin/Release/{quicinterop,quicinteropserver}
+          # perfcompare.py expects these paths relative to workspace:
+          #   binaries/neqo/{neqo-client,neqo-server}
           #   google-quiche/bazel-bin/quiche/{quic_client,quic_server}
           #   quiche/target/release/{quiche-client,quiche-server}
-          #   s2n-quic/target/release/s2n-quic-qns
-          mkdir -p binaries/neqo binaries/neqo-main
+          mkdir -p binaries/neqo
           cp "$ARTS/build-neqo/neqo-client" "$ARTS/build-neqo/neqo-server" binaries/neqo/
-          cp "$ARTS/build-neqo/neqo-client" "$ARTS/build-neqo/neqo-server" binaries/neqo-main/
-
-          mkdir -p msquic/build/bin/Release
-          cp "$ARTS"/build-msquic/* msquic/build/bin/Release/
 
           mkdir -p google-quiche/bazel-bin/quiche
           cp "$ARTS"/build-google/* google-quiche/bazel-bin/quiche/
 
           mkdir -p quiche/target/release
           cp "$ARTS"/build-quiche/* quiche/target/release/
-
-          mkdir -p s2n-quic/target/release
-          cp "$ARTS"/build-s2n/* s2n-quic/target/release/
 
           {
             echo "LD_LIBRARY_PATH=$ARTS/build-neqo/lib:$LD_LIBRARY_PATH"
@@ -71,43 +52,119 @@ jobs:
             echo "NSS_PREBUILT=1"
           } >> "$GITHUB_ENV"
 
+      - name: Install Rust
+        uses: ./.github/actions/rust
+        with:
+          version: stable
+          tools: hyperfine
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up testdata
+        run: |
+          mkdir -p testdata
+          openssl req -nodes -new -x509 \
+            -keyout testdata/key \
+            -out testdata/cert \
+            -subj "/CN=DOMAIN" 2>/dev/null
+          truncate -s "$TRANSFER_SIZE" "testdata/$TRANSFER_SIZE"
+          echo "TESTDATA=$GITHUB_WORKSPACE/testdata" >> "$GITHUB_ENV"
+
       # Disable turboboost, hyperthreading and use performance governor.
+      # Also creates "cpu23", "cpu2" and "cpu3" CPU sets for use with cset.
+      # On the bencher, logical cores 2 and 3 have been isolated for use by the benchmarks.
       - name: Prepare machine
         run: |
-          sudo /root/bin/prep.sh
+          # Create cpusets for pinning server (cpu2 -> CPU 14) and client (cpu3 -> CPU 15)
+          sudo mkdir -p /cpusets
+          sudo mount -t cgroup -o cpuset cpuset /cpusets 2>/dev/null || true
+          sudo mkdir -p /cpusets/cpu23
+          echo 14-15 | sudo tee /cpusets/cpu23/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu23/cpuset.mems
+          sudo mkdir -p /cpusets/cpu2
+          echo 14 | sudo tee /cpusets/cpu2/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu2/cpuset.mems
+          sudo mkdir -p /cpusets/cpu3
+          echo 15 | sudo tee /cpusets/cpu3/cpuset.cpus
+          echo 0 | sudo tee /cpusets/cpu3/cpuset.mems
+          # See https://github.com/microsoft/msquic/issues/4618#issuecomment-2422611592
           sudo ip link set dev lo mtu "$MTU"
 
-      - name: Compare QUIC implementations
+      - name: Run benchmarks
         run: |
-          python3 neqo/.github/scripts/perfcompare.py \
-            --host 127.0.0.1 \
-            --port 4433 \
-            --size "$TRANSFER_SIZE" \
-            --runs 100 \
-            --workspace "$GITHUB_WORKSPACE/neqo" \
-            --perf-opt "record -F2999 --call-graph fp -g"
+          WS="$GITHUB_WORKSPACE"
+          mkdir -p results
 
-      # Re-enable turboboost, hyperthreading and use powersave governor.
+          # Exact hyperfine invocation from perfcompare.py's hyperfine():
+          #   nice -n -20 setarch --addr-no-randomize hyperfine
+          #     --command-name NAME
+          #     --time-unit millisecond
+          #     --export-json OUT
+          #     --output null
+          #     --warmup 5
+          #     --min-runs RUNS
+          #     --prepare "WS/SERVER_CMD & echo $! >> /cpusets/cpu2/tasks; sleep 0.2"
+          #     --conclude "pkill SERVER_TAG"
+          #     "echo $$ >> /cpusets/cpu3/tasks; WS/CLIENT_CMD"
+          #
+          # Commands (traced from perfcompare.py IMPLS + mangle() for each combination):
+          #
+          # quiche-quiche (cc="", pacing=False → opts=[("",False)]):
+          #   server: quiche/target/release/quiche-server --root TESTDATA --listen HOST:PORT --cert TESTDATA/cert --key TESTDATA/key
+          #   client: quiche/target/release/quiche-client --no-verify https://HOST:PORT/SIZE
+          #
+          # google-neqo (cc="cubic", pacing=True):
+          #   server: binaries/neqo/neqo-server --cc cubic -Q 1 HOST:PORT
+          #   client: google-quiche/bazel-bin/quiche/quic_client --disable_certificate_verification https://HOST:PORT/SIZE
+          #
+          # quiche-neqo (cc="cubic", pacing=True):
+          #   server: binaries/neqo/neqo-server --cc cubic -Q 1 HOST:PORT
+          #   client: quiche/target/release/quiche-client --no-verify https://HOST:PORT/SIZE
+
+          run_bench() {
+            local name="$1" server_cmd="$2" client_cmd="$3"
+            local tag
+            tag=$(basename "${server_cmd%% *}")
+            tag="${tag:0:15}"
+            sudo nice -n -20 setarch --addr-no-randomize \
+              hyperfine \
+                --command-name "$name" \
+                --time-unit millisecond \
+                --export-json "results/$name.json" \
+                --output null \
+                --warmup 5 \
+                --min-runs 100 \
+                --prepare "$WS/$server_cmd & echo \$! >> /cpusets/cpu2/tasks; sleep 0.2" \
+                --conclude "pkill $tag" \
+                "echo \$\$ >> /cpusets/cpu3/tasks; $WS/$client_cmd"
+          }
+
+          # quiche-quiche
+          run_bench \
+            "quiche-quiche" \
+            "quiche/target/release/quiche-server --root $TESTDATA --listen $HOST:$PORT --cert $TESTDATA/cert --key $TESTDATA/key" \
+            "quiche/target/release/quiche-client --no-verify https://$HOST:$PORT/$TRANSFER_SIZE"
+
+          # google-neqo
+          run_bench \
+            "google-neqo-cubic" \
+            "binaries/neqo/neqo-server --cc cubic -Q 1 $HOST:$PORT" \
+            "google-quiche/bazel-bin/quiche/quic_client --disable_certificate_verification https://$HOST:$PORT/$TRANSFER_SIZE"
+
+          # quiche-neqo
+          run_bench \
+            "quiche-neqo-cubic" \
+            "binaries/neqo/neqo-server --cc cubic -Q 1 $HOST:$PORT" \
+            "quiche/target/release/quiche-client --no-verify https://$HOST:$PORT/$TRANSFER_SIZE"
+
       - name: Restore machine
         if: success() || failure() || cancelled()
         run: |
-          sudo /root/bin/unprep.sh
+          # sudo /root/bin/unprep.sh
           sudo ip link set dev lo mtu 65536
 
-      - name: Export performance data
+      - name: Upload results
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: ${{ github.event.repository.name }}-${{ github.event.pull_request.head.sha }}-perfcompare
-          path: |
-            *.svg
-            *.txt
-            *.md
-            hyperfine
-            hyperfine-main
-          compression-level: 9
-
-      - name: Remove benchmark artifacts
-        if: always()
-        run: |
-          rm -- * || true
-          rm -r -- binaries hyperfine hyperfine-main || true
+          name: perfcompare-${{ github.run_id }}-${{ github.run_attempt }}
+          path: results/*.json
+          compression-level: 0
