@@ -30,6 +30,14 @@ use std::{
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
+fn parse_cmd(cmd: &str) -> (String, Vec<String>) {
+    let mut words =
+        shell_words::split(cmd).unwrap_or_else(|e| panic!("invalid command `{cmd}`: {e}"));
+    assert!(!words.is_empty(), "empty command");
+    let prog = words.remove(0);
+    (prog, words)
+}
+
 struct PerfBench {
     name: &'static str,
     server_env: &'static str,
@@ -54,9 +62,10 @@ const BENCHMARKS: &[PerfBench] = &[
     },
 ];
 
-fn spawn_shell(cmd: &str) -> Child {
-    Command::new("sh")
-        .args(["-c", cmd])
+fn spawn_cmd(cmd: &str) -> Child {
+    let (prog, args) = parse_cmd(cmd);
+    Command::new(prog)
+        .args(args)
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()
@@ -81,7 +90,7 @@ fn port_is_bound(port: u16) -> bool {
 }
 
 fn start_server(cmd: &str) -> Child {
-    let mut child = spawn_shell(cmd);
+    let mut child = spawn_cmd(cmd);
 
     thread::sleep(Duration::from_secs(3));
 
@@ -123,8 +132,9 @@ fn perfcompare(c: &mut Criterion) {
         // 2. Benchmark: run the client command.
         group.bench_function(format!("criterion-{}", bench.name), |b| {
             b.iter(|| {
-                let status = Command::new("sh")
-                    .args(["-c", &client_cmd])
+                let (prog, args) = parse_cmd(&client_cmd);
+                let status = Command::new(prog)
+                    .args(args)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()

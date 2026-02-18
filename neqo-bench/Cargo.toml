@@ -19,6 +19,7 @@ workspace = true
 
 [dev-dependencies]
 criterion = { version = "4", package = "codspeed-criterion-compat", default-features = false }
+shell-words = "1"
 
 [features]
 bench = []

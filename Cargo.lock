@@ -784,6 +784,7 @@ name = "neqo-bench"
 version = "0.22.2"
 dependencies = [
  "codspeed-criterion-compat",
+ "shell-words",
 ]
 
 [[package]]
@@ -1214,6 +1215,12 @@ dependencies = [
  "cpufeatures",
  "digest",
 ]
+
+[[package]]
+name = "shell-words"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
 
 [[package]]
 name = "shlex"

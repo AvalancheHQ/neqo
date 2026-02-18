@@ -22,143 +22,10 @@ defaults:
     shell: bash
 
 jobs:
-  bench-matrix:
-    name: Determine bench matrix
-    runs-on: ubuntu-24.04
-    outputs:
-      benches: ${{ steps.matrix.outputs.benches }}
-      walltime-benches: ${{ steps.matrix.outputs.walltime-benches }}
-      has-walltime: ${{ steps.matrix.outputs.has-walltime }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - id: matrix
-        uses: ./.github/actions/bench-matrix
-
-  # Build neqo for walltime benchmarks and perfcompare on ARM64.
-  # CodSpeed's macro runners are aarch64, so we build on ARM for compatibility.
-  # Using ubuntu-22.04 for glibc compatibility with CodSpeed runners.
-  build-neqo:
-    name: Build neqo
-    runs-on: ubuntu-22.04-arm
-    needs: bench-matrix
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/rust
-        with:
-          version: stable
-          tools: cargo-codspeed
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: ./.github/actions/nss
-
-      - name: Build neqo binaries
-        run: |
-          export RUSTFLAGS="-C force-frame-pointers=yes"
-          cargo build --locked --profile bench --features bench --bin neqo-client --bin neqo-server
-
-      - name: Build walltime benchmarks
-        if: needs.bench-matrix.outputs.has-walltime == 'true'
-        env:
-          WALLTIME_BENCHES: ${{ needs.bench-matrix.outputs.walltime-benches }}
-        run: |
-          cargo binstall cargo-codspeed --locked --force
-          cargo codspeed build -p neqo-bench --features bench --locked -m walltime
-
-      - name: Bundle artifacts
-        run: |
-          mkdir -p dist/lib
-          # Neqo binaries
-          cp target/release/neqo-client target/release/neqo-server dist/
-          # Codspeed benchmarks
-          cp -r target/codspeed dist/
-          # Test fixture for certificate database
-          cp -r test-fixture dist/
-          # NSS/NSPR libraries
-          if [ -d "$NSS_DIR/../dist/Release/lib" ]; then
-            cp -L "$NSS_DIR"/../dist/Release/lib/*.so dist/lib/ 2>/dev/null || true
-            cp -L "$NSS_DIR"/../dist/Release/lib/*.so.* dist/lib/ 2>/dev/null || true
-          else
-            for lib in nss3 nssutil3 smime3 ssl3 nspr4 plc4 plds4; do
-              cp -L /usr/lib/*/lib${lib}.so* dist/lib/ 2>/dev/null || true
-            done
-          fi
-
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: build-neqo
-          path: dist
-          retention-days: 1
-
-  build-msquic:
-    name: Build msquic
-    runs-on: ubuntu-22.04-arm
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          sparse-checkout: .github/actions
-          persist-credentials: false
-
-      - uses: ./.github/actions/quic-build
-        with:
-          impl: msquic
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifact-name: build-msquic
-
-  build-google:
-    name: Build google/quiche
-    runs-on: ubuntu-22.04-arm
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          sparse-checkout: .github/actions
-          persist-credentials: false
-
-      - uses: ./.github/actions/quic-build
-        with:
-          impl: google
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifact-name: build-google
-
-  build-quiche:
-    name: Build cloudflare/quiche
-    runs-on: ubuntu-22.04-arm
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          sparse-checkout: .github/actions
-          persist-credentials: false
-
-      - uses: ./.github/actions/quic-build
-        with:
-          impl: quiche
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifact-name: build-quiche
-
-  build-s2n:
-    name: Build s2n-quic
-    runs-on: ubuntu-22.04-arm
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          sparse-checkout: .github/actions
-          persist-credentials: false
-
-      - uses: ./.github/actions/quic-build
-        with:
-          impl: s2n
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifact-name: build-s2n
-
   benchmarks:
     name: Benchmarks
     runs-on: # zizmor: ignore[self-hosted-runner]
       labels: codspeed-macro
-    needs: [bench-matrix, build-neqo, build-msquic, build-quiche, build-google, build-s2n]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -171,37 +38,28 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           cache-key-suffix: -codspeed
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-neqo
-          path: dist
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-msquic
-          path: build-msquic
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-google
-          path: build-google
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-quiche
-          path: build-quiche
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: build-s2n
-          path: build-s2n
-
       - name: Set up build artifacts
         run: |
-          mkdir -p target
-          mv dist/codspeed target/
-          find target/codspeed -type f -exec chmod +x {} +
-          chmod +x build-*/*
+          chmod +x artifacts/build-msquic/*
+          chmod +x artifacts/build-google/*
+          chmod +x artifacts/build-quiche/*
+          chmod +x artifacts/build-s2n/*
+          chmod +x artifacts/build-neqo/neqo-client artifacts/build-neqo/neqo-server
+          # neqo-crypto/build.rs expects $NSS_DIR/../dist/{Release,public,private}.
+          # Our artifacts have those directly under build-neqo/, so create
+          # build-neqo/dist -> . and point NSS_DIR at the fake build-neqo/nss subdir.
+          ln -sfn . "$GITHUB_WORKSPACE/artifacts/build-neqo/dist"
           {
-            echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/dist/lib:$LD_LIBRARY_PATH"
-            echo "NSS_DB_PATH=$GITHUB_WORKSPACE/dist/test-fixture/db"
+            echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/artifacts/build-neqo/lib:$LD_LIBRARY_PATH"
+            echo "NSS_DB_PATH=$GITHUB_WORKSPACE/artifacts/build-neqo/test-fixture/db"
+            echo "NSS_DIR=$GITHUB_WORKSPACE/artifacts/build-neqo/nss"
+            echo "NSS_PREBUILT=1"
           } >> "$GITHUB_ENV"
+
+      - name: Build walltime benchmarks
+        run: |
+          cargo binstall cargo-codspeed --locked --force
+          cargo codspeed build -p neqo-bench --features bench --locked -m walltime
 
       - name: Setup test environment
         uses: ./.github/actions/testdata-setup
@@ -225,8 +83,6 @@ jobs:
             echo "CLIENT_CPU=$CLIENT_CPU"
           } >> "$GITHUB_ENV"
 
-      - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness --force
-
       # --- Criterion (walltime) benchmarks ---
       - name: Generate commands (quiche-quiche) for walltime
         id: wt-cmd-quiche-quiche
@@ -235,7 +91,7 @@ jobs:
           client: quiche
           server: quiche
           size: ${{ env.TRANSFER_SIZE }}
-          quiche-path: ${{ github.workspace }}/build-quiche
+          quiche-path: ${{ github.workspace }}/artifacts/build-quiche
           testdata-path: ${{ github.workspace }}/testdata
 
       - name: Generate commands (google-neqo) for walltime
@@ -247,8 +103,8 @@ jobs:
           size: ${{ env.TRANSFER_SIZE }}
           cubic: "true"
           pacing: "true"
-          neqo-path: ${{ github.workspace }}/dist
-          google-path: ${{ github.workspace }}/build-google
+          neqo-path: ${{ github.workspace }}/artifacts/build-neqo
+          google-path: ${{ github.workspace }}/artifacts/build-google
           testdata-path: ${{ github.workspace }}/testdata
 
       - name: Generate commands (quiche-neqo) for walltime
@@ -260,8 +116,8 @@ jobs:
           size: ${{ env.TRANSFER_SIZE }}
           cubic: "true"
           pacing: "true"
-          neqo-path: ${{ github.workspace }}/dist
-          quiche-path: ${{ github.workspace }}/build-quiche
+          neqo-path: ${{ github.workspace }}/artifacts/build-neqo
+          quiche-path: ${{ github.workspace }}/artifacts/build-quiche
           testdata-path: ${{ github.workspace }}/testdata
 
       - name: Set perfcompare environment
@@ -295,7 +151,7 @@ jobs:
           client: quiche
           server: quiche
           size: ${{ env.TRANSFER_SIZE }}
-          quiche-path: ${{ github.workspace }}/build-quiche
+          quiche-path: ${{ github.workspace }}/artifacts/build-quiche
           testdata-path: ${{ github.workspace }}/testdata
 
       - name: Set command environment (quiche-quiche)
@@ -326,6 +182,8 @@ jobs:
             kill "$SERVER_PID" 2>/dev/null || true
             exit 1
           fi
+
+      - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness --force
 
       - name: Create benchmark config (quiche-quiche)
         run: |
@@ -359,8 +217,8 @@ jobs:
           size: ${{ env.TRANSFER_SIZE }}
           cubic: "true"
           pacing: "true"
-          neqo-path: ${{ github.workspace }}/dist
-          google-path: ${{ github.workspace }}/build-google
+          neqo-path: ${{ github.workspace }}/artifacts/build-neqo
+          google-path: ${{ github.workspace }}/artifacts/build-google
           testdata-path: ${{ github.workspace }}/testdata
 
       - name: Set command environment (google-neqo)
@@ -424,8 +282,8 @@ jobs:
           size: ${{ env.TRANSFER_SIZE }}
           cubic: "true"
           pacing: "true"
-          neqo-path: ${{ github.workspace }}/dist
-          quiche-path: ${{ github.workspace }}/build-quiche
+          neqo-path: ${{ github.workspace }}/artifacts/build-neqo
+          quiche-path: ${{ github.workspace }}/artifacts/build-quiche
           testdata-path: ${{ github.workspace }}/testdata
 
       - name: Set command environment (quiche-neqo)
