@@ -85,7 +85,7 @@ def sh(cmd, **kw):
 def mangle(cmd, cc, pacing, flags, disk):
     """Replace placeholders, return (command, filename_extension)."""
     ext = f"-{cc}" if cc else ""
-    if not pacing:
+    if cc and not pacing:
         ext += "-nopacing"
     cmd = (
         cmd.replace("_cc", f"--cc {cc}" if cc else "")
@@ -276,12 +276,15 @@ def process(cfg, name, bold):
     return row
 
 
+PAIRS = {("quiche", "quiche"), ("google", "neqo"), ("quiche", "neqo")}
+
+
 def run(cfg, tmp):
     """Run all comparisons."""
     steps = []
     for server, scfg in IMPLS.items():
         for client, ccfg in IMPLS.items():
-            if client != server and client != "neqo" and server != "neqo":
+            if (client, server) not in PAIRS:
                 print(f"Skipping {client} vs. {server}")
                 continue
             print(f"*** {client} vs. {server}")
@@ -328,17 +331,7 @@ def run(cfg, tmp):
                 if not verify(cfg, tmp, client, scmd, ccmd_d):
                     raise RuntimeError(f"Transfer failed: {client} vs. {server}")
 
-                if client == "neqo" or server == "neqo":
-                    hyperfine(
-                        cfg,
-                        scmd.replace("neqo/", "neqo-main/"),
-                        ccmd.replace("neqo/", "neqo-main/"),
-                        name,
-                        cfg.workspace / "hyperfine-main",
-                    )
-
                 hyperfine(cfg, scmd, ccmd, name, cfg.workspace / "hyperfine", md=True)
-                perf(cfg, scmd, ccmd, name)
 
                 bold = client == server or (
                     client == "neqo" and server == "neqo" and cc == "cubic" and pacing
