@@ -270,12 +270,12 @@ jobs:
           CLIENT_CPU: ${{ steps.cpu-tuning.outputs.client-cpu }}
         run: |
           {
-            echo "QUICHE_QUICHE_SERVER_CMD=taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.server-cmd }}"
-            echo "QUICHE_QUICHE_CLIENT_CMD=taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.client-cmd }}"
-            echo "GOOGLE_NEQO_SERVER_CMD=taskset -c $SERVER_CPU ${{ steps.wt-cmd-google-neqo.outputs.server-cmd }}"
-            echo "GOOGLE_NEQO_CLIENT_CMD=taskset -c $CLIENT_CPU ${{ steps.wt-cmd-google-neqo.outputs.client-cmd }}"
-            echo "QUICHE_NEQO_SERVER_CMD=taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.server-cmd }}"
-            echo "QUICHE_NEQO_CLIENT_CMD=taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.client-cmd }}"
+            echo "QUICHE_QUICHE_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.server-cmd }}"
+            echo "QUICHE_QUICHE_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.client-cmd }}"
+            echo "GOOGLE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-google-neqo.outputs.server-cmd }}"
+            echo "GOOGLE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-google-neqo.outputs.client-cmd }}"
+            echo "QUICHE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.server-cmd }}"
+            echo "QUICHE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.client-cmd }}"
           } >> "$GITHUB_ENV"
 
       - name: Run Criterion bench & upload results
@@ -313,7 +313,7 @@ jobs:
       - name: Start server (quiche-quiche)
         run: |
           # shellcheck disable=SC2086
-          taskset -c "$SERVER_CPU" $SERVER_CMD &
+          nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
           echo "SERVER_PID=$!" >> "$GITHUB_ENV"
           sleep 1
 
@@ -322,7 +322,7 @@ jobs:
           {
             echo "benchmarks:"
             echo "  - name: \"$BENCH_NAME\""
-            echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
+            echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
             echo "      min-rounds: 150"
           } > codspeed.yml
@@ -368,7 +368,7 @@ jobs:
       - name: Start server (google-neqo)
         run: |
           # shellcheck disable=SC2086
-          taskset -c "$SERVER_CPU" $SERVER_CMD &
+          nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
           echo "SERVER_PID=$!" >> "$GITHUB_ENV"
           sleep 1
 
@@ -377,7 +377,7 @@ jobs:
           {
             echo "benchmarks:"
             echo "  - name: \"$BENCH_NAME\""
-            echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
+            echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
             echo "      min-rounds: 100"
           } > codspeed.yml
@@ -423,7 +423,7 @@ jobs:
       - name: Start server (quiche-neqo)
         run: |
           # shellcheck disable=SC2086
-          taskset -c "$SERVER_CPU" $SERVER_CMD &
+          nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
           echo "SERVER_PID=$!" >> "$GITHUB_ENV"
           sleep 1
 
@@ -432,7 +432,7 @@ jobs:
           {
             echo "benchmarks:"
             echo "  - name: \"$BENCH_NAME\""
-            echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
+            echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
             echo "      min-rounds: 150"
           } > codspeed.yml
