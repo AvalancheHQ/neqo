@@ -233,7 +233,7 @@ export QUICHE_QUICHE_SERVER_CMD QUICHE_QUICHE_CLIENT_CMD
 export GOOGLE_NEQO_SERVER_CMD GOOGLE_NEQO_CLIENT_CMD
 export QUICHE_NEQO_SERVER_CMD QUICHE_NEQO_CLIENT_CMD
 
-# codspeed run -m walltime -- cargo codspeed run -p neqo-bench
+codspeed run -m walltime -- cargo codspeed run -p neqo-bench
 echo SKIPPED
 
 # ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ echo SKIPPED
 
 gen_commands quiche quiche
 start_server "quiche-quiche"
-run_bench "quiche-quiche" 10
+run_bench "quiche-quiche" 150
 stop_server
 
 # ---------------------------------------------------------------------------
@@ -251,7 +251,7 @@ stop_server
 
 gen_commands google neqo true true
 start_server "google-neqo"
-run_bench "google-neqo" 10
+run_bench "google-neqo" 100
 stop_server
 
 # ---------------------------------------------------------------------------
@@ -260,7 +260,7 @@ stop_server
 
 gen_commands quiche neqo true true
 start_server "quiche-neqo"
-run_bench "quiche-neqo" 10
+run_bench "quiche-neqo" 150
 stop_server
 
 echo "Done."
