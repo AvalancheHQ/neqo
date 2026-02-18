@@ -62,9 +62,8 @@ def stats(values: list[float]) -> dict:
 # ── artifact fetching ─────────────────────────────────────────────────────────
 
 def get_run_ids(repo: str, branch: str) -> list[int]:
-    data = gh(f"/repos/{repo}/actions/workflows/perfcompare.yml/runs",
-              "-f", f"branch={branch}", "-f", "status=success", "-f", "per_page=100")
-    runs = data["workflow_runs"]
+    data = gh(f"/repos/{repo}/actions/workflows/perfcompare.yml/runs?per_page=100")
+    runs = [r for r in data["workflow_runs"] if r["head_branch"] == branch and r["conclusion"] == "success"]
     if not runs:
         print(f"No successful perfcompare runs found on branch '{branch}'", file=sys.stderr)
         sys.exit(1)

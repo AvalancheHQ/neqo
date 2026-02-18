@@ -93,7 +93,7 @@ jobs:
             --host 127.0.0.1 \
             --port 4433 \
             --size "$TRANSFER_SIZE" \
-            --runs 5 \
+            --runs 150 \
             --workspace "$GITHUB_WORKSPACE"
 
       - name: Restore machine
