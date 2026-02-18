@@ -58,15 +58,45 @@ fn spawn_shell(cmd: &str) -> Child {
     Command::new("sh")
         .args(["-c", cmd])
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn()
         .unwrap_or_else(|e| panic!("failed to spawn `{cmd}`: {e}"))
 }
 
+fn port_is_bound(port: u16) -> bool {
+    // Check /proc/net/udp and /proc/net/udp6 for the port in hex.
+    let hex_port = format!("{port:04X}");
+    for path in ["/proc/net/udp", "/proc/net/udp6"] {
+        if let Ok(contents) = std::fs::read_to_string(path) {
+            for line in contents.lines().skip(1) {
+                if let Some(addr_field) = line.split_whitespace().nth(1) {
+                    if addr_field.ends_with(&format!(":{hex_port}")) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
 fn start_server(cmd: &str) -> Child {
-    let child = spawn_shell(cmd);
-    // Give the server time to bind its socket, same as the workflow's `sleep 1`.
-    thread::sleep(Duration::from_secs(1));
+    let mut child = spawn_shell(cmd);
+
+    thread::sleep(Duration::from_secs(3));
+
+    match child.try_wait() {
+        Ok(Some(status)) => panic!("server exited prematurely with {status}: `{cmd}`"),
+        Ok(None) => {}
+        Err(e) => panic!("failed to poll server process: {e}"),
+    }
+
+    if !port_is_bound(4433) {
+        let _ = child.kill();
+        let _ = child.wait();
+        panic!("server is not listening on UDP port 4433 after 3 s: `{cmd}`");
+    }
+
     child
 }
 

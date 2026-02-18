@@ -314,8 +314,18 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           taskset -c "$SERVER_CPU" $SERVER_CMD &
-          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
-          sleep 1
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+          sleep 3
+          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+            echo "::error::Server (quiche-quiche) exited prematurely"
+            exit 1
+          fi
+          if ! ss -ulnp | grep -q ":4433 "; then
+            echo "::error::Server (quiche-quiche) is not listening on UDP port 4433"
+            kill "$SERVER_PID" 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Create benchmark config (quiche-quiche)
         run: |
@@ -369,8 +379,18 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           taskset -c "$SERVER_CPU" $SERVER_CMD &
-          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
-          sleep 1
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+          sleep 3
+          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+            echo "::error::Server (google-neqo) exited prematurely"
+            exit 1
+          fi
+          if ! ss -ulnp | grep -q ":4433 "; then
+            echo "::error::Server (google-neqo) is not listening on UDP port 4433"
+            kill "$SERVER_PID" 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Create benchmark config (google-neqo)
         run: |
@@ -424,8 +444,18 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           taskset -c "$SERVER_CPU" $SERVER_CMD &
-          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
-          sleep 1
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+          sleep 3
+          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+            echo "::error::Server (quiche-neqo) exited prematurely"
+            exit 1
+          fi
+          if ! ss -ulnp | grep -q ":4433 "; then
+            echo "::error::Server (quiche-neqo) is not listening on UDP port 4433"
+            kill "$SERVER_PID" 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Create benchmark config (quiche-neqo)
         run: |
