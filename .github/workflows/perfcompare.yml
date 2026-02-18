@@ -1,0 +1,113 @@
+name: Performance comparison
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+env:
+  CARGO_PROFILE_BENCH_BUILD_OVERRIDE_DEBUG: true
+  CARGO_PROFILE_RELEASE_DEBUG: true
+  RUSTUP_TOOLCHAIN: stable
+  MTU: 1504 # https://github.com/microsoft/msquic/issues/4618
+  TRANSFER_SIZE: 33554432 # 32 MiB
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  perfcompare:
+    name: Performance comparison
+    runs-on: 'self-hosted' # zizmor: ignore[self-hosted-runner]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout mozilla/neqo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: mozilla/neqo
+          path: neqo
+          persist-credentials: false
+          clean: false
+
+      - name: Set up build artifacts
+        working-directory: neqo
+        run: |
+          ARTS="$GITHUB_WORKSPACE/neqo/artifacts"
+          chmod +x "$ARTS"/build-msquic/* "$ARTS"/build-google/* "$ARTS"/build-quiche/* "$ARTS"/build-s2n/*
+          chmod +x "$ARTS/build-neqo/neqo-client" "$ARTS/build-neqo/neqo-server"
+
+          # perfcompare.py expects paths relative to --workspace (neqo/) like:
+          #   binaries/neqo/{neqo-client,neqo-server}   (PR branch)
+          #   binaries/neqo-main/{neqo-client,neqo-server}  (main baseline)
+          #   msquic/build/bin/Release/{quicinterop,quicinteropserver}
+          #   google-quiche/bazel-bin/quiche/{quic_client,quic_server}
+          #   quiche/target/release/{quiche-client,quiche-server}
+          #   s2n-quic/target/release/s2n-quic-qns
+          mkdir -p binaries/neqo binaries/neqo-main
+          cp "$ARTS/build-neqo/neqo-client" "$ARTS/build-neqo/neqo-server" binaries/neqo/
+          cp "$ARTS/build-neqo/neqo-client" "$ARTS/build-neqo/neqo-server" binaries/neqo-main/
+
+          mkdir -p msquic/build/bin/Release
+          cp "$ARTS"/build-msquic/* msquic/build/bin/Release/
+
+          mkdir -p google-quiche/bazel-bin/quiche
+          cp "$ARTS"/build-google/* google-quiche/bazel-bin/quiche/
+
+          mkdir -p quiche/target/release
+          cp "$ARTS"/build-quiche/* quiche/target/release/
+
+          mkdir -p s2n-quic/target/release
+          cp "$ARTS"/build-s2n/* s2n-quic/target/release/
+
+          {
+            echo "LD_LIBRARY_PATH=$ARTS/build-neqo/lib:$LD_LIBRARY_PATH"
+            echo "NSS_DB_PATH=$ARTS/build-neqo/test-fixture/db"
+            echo "NSS_DIR=$ARTS/build-neqo/nss"
+            echo "NSS_PREBUILT=1"
+          } >> "$GITHUB_ENV"
+
+      # Disable turboboost, hyperthreading and use performance governor.
+      - name: Prepare machine
+        run: |
+          sudo /root/bin/prep.sh
+          sudo ip link set dev lo mtu "$MTU"
+
+      - name: Compare QUIC implementations
+        run: |
+          python3 neqo/.github/scripts/perfcompare.py \
+            --host 127.0.0.1 \
+            --port 4433 \
+            --size "$TRANSFER_SIZE" \
+            --runs 100 \
+            --workspace "$GITHUB_WORKSPACE/neqo" \
+            --perf-opt "record -F2999 --call-graph fp -g"
+
+      # Re-enable turboboost, hyperthreading and use powersave governor.
+      - name: Restore machine
+        if: success() || failure() || cancelled()
+        run: |
+          sudo /root/bin/unprep.sh
+          sudo ip link set dev lo mtu 65536
+
+      - name: Export performance data
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ${{ github.event.repository.name }}-${{ github.event.pull_request.head.sha }}-perfcompare
+          path: |
+            *.svg
+            *.txt
+            *.md
+            hyperfine
+            hyperfine-main
+          compression-level: 9
+
+      - name: Remove benchmark artifacts
+        if: always()
+        run: |
+          rm -- * || true
+          rm -r -- binaries hyperfine hyperfine-main || true
