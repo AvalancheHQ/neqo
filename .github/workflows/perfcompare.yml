@@ -7,9 +7,9 @@ env:
   MTU: 1504 # https://github.com/microsoft/msquic/issues/4618
   TRANSFER_SIZE: 33554432 # 32 MiB
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+#   cancel-in-progress: true
 
 permissions:
   contents: read
@@ -93,7 +93,7 @@ jobs:
             --host 127.0.0.1 \
             --port 4433 \
             --size "$TRANSFER_SIZE" \
-            --runs 150 \
+            --runs 5 \
             --workspace "$GITHUB_WORKSPACE"
 
       - name: Restore machine
@@ -108,7 +108,3 @@ jobs:
           name: perfcompare-${{ github.run_id }}-${{ github.run_attempt }}
           path: hyperfine/*.json
           compression-level: 0
-
-      - name: Cleanup
-        if: always()
-        run: rm -rf binaries hyperfine hyperfine-main google-quiche quiche
