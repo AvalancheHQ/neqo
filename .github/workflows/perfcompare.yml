@@ -82,6 +82,7 @@ jobs:
 
       - name: Compare QUIC implementations
         run: |
+          cargo install hyperfine --force
           sudo \
             LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
             NSS_DB_PATH="$NSS_DB_PATH" \
