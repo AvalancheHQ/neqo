@@ -129,13 +129,8 @@ stop_server() {
 
 kill_port() {
   # Kill any process already listening on UDP $PORT so re-runs don't fail.
-  local pids
-  pids=$(ss -ulnp "sport = :$PORT" | awk 'NR>1 && /pid=/{match($0,/pid=([0-9]+)/,a); if(a[1]) print a[1]}')
-  for pid in $pids; do
-    echo "Killing stale process $pid on UDP port $PORT"
-    kill "$pid" 2>/dev/null || true
-  done
-  # Give the OS a moment to release the port.
+  echo "Clearing UDP port $PORT..."
+  fuser -k "${PORT}/udp" 2>/dev/null || true
   sleep 1
 }
 
@@ -177,7 +172,7 @@ export NSS_PREBUILT=1
 # Build walltime benchmarks
 # ---------------------------------------------------------------------------
 
-cargo binstall cargo-codspeed --locked --force
+cargo binstall cargo-codspeed --locked --force -y
 cargo codspeed build -p neqo-bench --features bench --locked -m walltime
 
 # ---------------------------------------------------------------------------
