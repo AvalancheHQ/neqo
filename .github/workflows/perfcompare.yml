@@ -147,7 +147,7 @@ jobs:
               "https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-$ARCH"
             sudo chmod +x /usr/local/bin/bazel
           fi
-          bazel build -c opt --copt=-fno-omit-frame-pointer --copt=-g --strip=never --sandbox_writable_path="$HOME/.cache/sccache" quiche:quic_server quiche:quic_client
+          bazel build -c opt --copt=-fno-omit-frame-pointer --copt=-g --strip=never quiche:quic_server quiche:quic_client
           bazel shutdown
 
       - name: Build cloudflare/quiche
