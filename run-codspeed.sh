@@ -108,6 +108,7 @@ gen_commands() {
 
 start_server() {
   local label="$1"
+  kill_port
   # shellcheck disable=SC2086
   taskset -c "$SERVER_CPU" $SERVER_CMD &
   SERVER_PID=$!
@@ -124,6 +125,18 @@ start_server() {
 stop_server() {
   kill "$SERVER_PID" 2>/dev/null || true
   wait "$SERVER_PID" 2>/dev/null || true
+}
+
+kill_port() {
+  # Kill any process already listening on UDP $PORT so re-runs don't fail.
+  local pids
+  pids=$(ss -ulnp "sport = :$PORT" | awk 'NR>1 && /pid=/{match($0,/pid=([0-9]+)/,a); if(a[1]) print a[1]}')
+  for pid in $pids; do
+    echo "Killing stale process $pid on UDP port $PORT"
+    kill "$pid" 2>/dev/null || true
+  done
+  # Give the OS a moment to release the port.
+  sleep 1
 }
 
 run_bench() {
