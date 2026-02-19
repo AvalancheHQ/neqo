@@ -13,28 +13,28 @@ inputs:
     required: true
   cubic:
     description: Use cubic congestion control (neqo only)
-    default: 'true'
+    default: "true"
   pacing:
     description: Enable pacing (neqo only)
-    default: 'true'
+    default: "true"
   neqo-path:
     description: Path to neqo binaries
-    default: 'binaries'
+    default: "binaries"
   msquic-path:
     description: Path to msquic binaries
-    default: 'binaries'
+    default: "binaries"
   google-path:
     description: Path to google/quiche binaries
-    default: 'binaries'
+    default: "binaries"
   quiche-path:
     description: Path to cloudflare/quiche binaries
-    default: 'binaries'
+    default: "binaries"
   s2n-path:
     description: Path to s2n-quic binaries
-    default: 'binaries'
+    default: "binaries"
   testdata-path:
     description: Path to test data (certs, files)
-    default: 'testdata'
+    default: "testdata"
 
 outputs:
   bench-name:
@@ -101,8 +101,8 @@ runs:
         case "$CLIENT" in
           neqo)   CLIENT_CMD="$NEQO/neqo-client $NEQO_ARGS $INTEROP --output-dir . https://$HOST:$PORT/$SIZE" ;;
           msquic) CLIENT_CMD="$MSQUIC/quicinterop -test:D -custom:$HOST -port:$PORT -urls:https://$HOST:$PORT/$SIZE" ;;
-          google) CLIENT_CMD="bash -c '$GOOGLE/quic_client --disable_certificate_verification https://$HOST:$PORT/$SIZE > $SIZE'" ;;
-          quiche) CLIENT_CMD="$QUICHE/quiche-client --no-verify --dump-responses . https://$HOST:$PORT/$SIZE" ;;
+          google) CLIENT_CMD="$GOOGLE/quic_client --disable_certificate_verification https://$HOST:$PORT/$SIZE" ;;
+          quiche) CLIENT_CMD="$QUICHE/quiche-client --no-verify https://$HOST:$PORT/$SIZE" ;;
           s2n)    CLIENT_CMD="$S2N/s2n-quic-qns interop client --tls rustls --disable-cert-verification --download-dir . --local-ip $HOST https://$HOST:$PORT/$SIZE" ;;
         esac
 
