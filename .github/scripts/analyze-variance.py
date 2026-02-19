@@ -25,10 +25,26 @@ from pathlib import Path
 def gh(*args: str) -> dict | list:
     """Run `gh api` and return parsed JSON."""
     result = subprocess.run(
-        ["gh", "api", "--paginate", *args],
+        ["gh", "api", "--paginate", "--slurp", *args],
         capture_output=True, text=True, check=True,
     )
-    return json.loads(result.stdout)
+    pages = json.loads(result.stdout)
+    if not pages:
+        return []
+    # --slurp wraps each page as an array element; merge if they're all dicts with same keys
+    if isinstance(pages[0], list):
+        return [item for page in pages for item in page]
+    if len(pages) == 1:
+        return pages[0]
+    # Merge paginated dicts by combining list values
+    merged = {}
+    for page in pages:
+        for key, value in page.items():
+            if key not in merged:
+                merged[key] = value
+            elif isinstance(value, list):
+                merged[key] = merged[key] + value
+    return merged
 
 
 def format_duration(seconds: float) -> str:
