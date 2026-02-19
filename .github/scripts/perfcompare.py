@@ -151,10 +151,32 @@ def verify(cfg, tmp, client, server_cmd, client_cmd):
     return out.exists() and out.stat().st_size >= cfg.size
 
 
-def hyperfine(cfg, scmd, ccmd, name, out_dir, md=False):
-    """Run hyperfine benchmark."""
-    tag = shlex.quote(Path(scmd.split()[0]).name[:15])
-    ws = shlex.quote(str(cfg.workspace))
+def start_server(cfg, scmd):
+    """Start server process, pin to cpuset, and wait for it to be ready."""
+    proc = subprocess.Popen(
+        shlex.split(f"{cfg.workspace}/{scmd}"),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    # Pin to cpuset
+    cpuset_tasks = Path("/cpusets/cpu2/tasks")
+    if cpuset_tasks.exists():
+        cpuset_tasks.write_text(str(proc.pid), encoding="utf-8")
+    time.sleep(0.2)
+    if proc.poll() is not None:
+        raise RuntimeError(f"Server exited prematurely (exit code {proc.returncode})")
+    return proc
+
+
+def stop_server(scmd, proc):
+    """Stop the server process."""
+    tag = Path(scmd.split()[0]).name[:15]
+    sh(["pkill", tag])
+    proc.wait()
+
+
+def hyperfine(cfg, ccmd, name, out_dir, md=False):
+    """Run hyperfine benchmark against an already-running server."""
     out_dir.mkdir(exist_ok=True)
     cmd = [
         "nice",
@@ -175,14 +197,10 @@ def hyperfine(cfg, scmd, ccmd, name, out_dir, md=False):
         "5",
         "--min-runs",
         str(cfg.runs),
-        "--prepare",
-        f"{ws}/{scmd} & echo $! >> /cpusets/cpu2/tasks; sleep 0.2",
-        "--conclude",
-        f"pkill {tag}",
     ]
     if md:
         cmd += ["--export-markdown", str(out_dir / f"{name}.md")]
-    cmd.append(f"echo $$ >> /cpusets/cpu3/tasks; {ws}/{ccmd}")
+    cmd.append(f"echo $$ >> /cpusets/cpu3/tasks; {cfg.workspace}/{ccmd}")
     subprocess.run(cmd, check=True)
 
 
@@ -331,7 +349,11 @@ def run(cfg, tmp):
                 if not verify(cfg, tmp, client, scmd, ccmd_d):
                     raise RuntimeError(f"Transfer failed: {client} vs. {server}")
 
-                hyperfine(cfg, scmd, ccmd, name, cfg.workspace / "hyperfine", md=True)
+                proc = start_server(cfg, scmd)
+                try:
+                    hyperfine(cfg, ccmd, name, cfg.workspace / "hyperfine", md=True)
+                finally:
+                    stop_server(scmd, proc)
 
                 bold = client == server or (
                     client == "neqo" and server == "neqo" and cc == "cubic" and pacing
