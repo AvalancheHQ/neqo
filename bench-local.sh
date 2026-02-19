@@ -196,7 +196,7 @@ sleep 1
 
 info "Starting server"
 # shellcheck disable=SC2086
-sudo LD_LIBRARY_PATH="$LD_LIBRARY_PATH" nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
+sudo LD_LIBRARY_PATH="$LD_LIBRARY_PATH" nice -n -20 "$SERVER_CPU" $SERVER_CMD &
 SERVER_PID=$!
 sleep 3
 
@@ -216,7 +216,7 @@ CONFIG_FILE="$WORKSPACE/codspeed.yml"
 cat > "$CONFIG_FILE" <<EOF
 benchmarks:
   - name: "$BENCH_NAME"
-    exec: taskset -c $CLIENT_CPU $CLIENT_CMD
+    exec: $CLIENT_CPU $CLIENT_CMD
     options:
       warmup-time: $WARMUP_TIME
       min-rounds: $MIN_ROUNDS
