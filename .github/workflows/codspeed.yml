@@ -126,10 +126,10 @@ jobs:
           CLIENT_CPU: ${{ steps.cpu-tuning.outputs.client-cpu }}
         run: |
           {
-            echo "QUICHE_QUICHE_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.server-cmd }}"
-            echo "QUICHE_QUICHE_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.client-cmd }}"
-            echo "GOOGLE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-google-neqo.outputs.server-cmd }}"
-            echo "GOOGLE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-google-neqo.outputs.client-cmd }}"
+            # echo "QUICHE_QUICHE_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.server-cmd }}"
+            # echo "QUICHE_QUICHE_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.client-cmd }}"
+            # echo "GOOGLE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-google-neqo.outputs.server-cmd }}"
+            # echo "GOOGLE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-google-neqo.outputs.client-cmd }}"
             echo "QUICHE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.server-cmd }}"
             echo "QUICHE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.client-cmd }}"
           } >> "$GITHUB_ENV"
@@ -146,139 +146,139 @@ jobs:
           upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
 
       # --- quiche vs quiche ---
-      - name: Generate commands (quiche-quiche)
-        id: cmd-quiche-quiche
-        uses: ./.github/actions/perfcompare-commands
-        with:
-          client: quiche
-          server: quiche
-          size: ${{ env.TRANSFER_SIZE }}
-          quiche-path: ${{ github.workspace }}/artifacts/build-quiche
-          testdata-path: ${{ github.workspace }}/testdata
-
-      - name: Set command environment (quiche-quiche)
-        env:
-          BENCH_NAME: ${{ steps.cmd-quiche-quiche.outputs.bench-name }}
-          SERVER_CMD: ${{ steps.cmd-quiche-quiche.outputs.server-cmd }}
-          CLIENT_CMD: ${{ steps.cmd-quiche-quiche.outputs.client-cmd }}
-        run: |
-          {
-            echo "BENCH_NAME=$BENCH_NAME"
-            echo "SERVER_CMD=$SERVER_CMD"
-            echo "CLIENT_CMD=$CLIENT_CMD"
-          } >> "$GITHUB_ENV"
-
-      - name: Start server (quiche-quiche)
-        run: |
-          # shellcheck disable=SC2086
-          nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
-          SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
-          sleep 3
-          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-            echo "::error::Server (quiche-quiche) exited prematurely"
-            exit 1
-          fi
-          if ! ss -ulnp | grep -q ":4433 "; then
-            echo "::error::Server (quiche-quiche) is not listening on UDP port 4433"
-            kill "$SERVER_PID" 2>/dev/null || true
-            exit 1
-          fi
-
-      - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness --force
-
-      - name: Create benchmark config (quiche-quiche)
-        run: |
-          {
-            echo "benchmarks:"
-            echo "  - name: \"$BENCH_NAME\""
-            echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
-            echo "    options:"
-            echo "      warmup-time: 10s"
-            echo "      min-rounds: 150"
-          } > codspeed.yml
-
-      - name: Run benchmark (quiche-quiche)
-        uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
-        env:
-          CODSPEED_PERF_ENABLED: false
-        with:
-          mode: walltime
-          working-directory: /tmp
-          upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
-          config: ${{ github.workspace }}/codspeed.yml
-
-      - name: Stop server (quiche-quiche)
-        if: always()
-        run: kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true
-
-      # --- google vs neqo ---
-      - name: Generate commands (google-neqo)
-        id: cmd-google-neqo
-        uses: ./.github/actions/perfcompare-commands
-        with:
-          client: google
-          server: neqo
-          size: ${{ env.TRANSFER_SIZE }}
-          cubic: "true"
-          pacing: "true"
-          neqo-path: ${{ github.workspace }}/artifacts/build-neqo
-          google-path: ${{ github.workspace }}/artifacts/build-google
-          testdata-path: ${{ github.workspace }}/testdata
-
-      - name: Set command environment (google-neqo)
-        env:
-          BENCH_NAME: ${{ steps.cmd-google-neqo.outputs.bench-name }}
-          SERVER_CMD: ${{ steps.cmd-google-neqo.outputs.server-cmd }}
-          CLIENT_CMD: ${{ steps.cmd-google-neqo.outputs.client-cmd }}
-        run: |
-          {
-            echo "BENCH_NAME=$BENCH_NAME"
-            echo "SERVER_CMD=$SERVER_CMD"
-            echo "CLIENT_CMD=$CLIENT_CMD"
-          } >> "$GITHUB_ENV"
-
-      - name: Start server (google-neqo)
-        run: |
-          # shellcheck disable=SC2086
-          nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
-          SERVER_PID=$!
-          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
-          sleep 3
-          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-            echo "::error::Server (google-neqo) exited prematurely"
-            exit 1
-          fi
-          if ! ss -ulnp | grep -q ":4433 "; then
-            echo "::error::Server (google-neqo) is not listening on UDP port 4433"
-            kill "$SERVER_PID" 2>/dev/null || true
-            exit 1
-          fi
-
-      - name: Create benchmark config (google-neqo)
-        run: |
-          {
-            echo "benchmarks:"
-            echo "  - name: \"$BENCH_NAME\""
-            echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
-            echo "    options:"
-            echo "      warmup-time: 10s"
-            echo "      min-rounds: 100"
-          } > codspeed.yml
-
-      - name: Run benchmark (google-neqo)
-        uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
-        env:
-          CODSPEED_PERF_ENABLED: false
-        with:
-          mode: walltime
-          working-directory: /tmp
-          upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
-          config: ${{ github.workspace }}/codspeed.yml
-
-      - name: Stop server (google-neqo)
-        if: always()
-        run: kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true
+      # - name: Generate commands (quiche-quiche)
+      #   id: cmd-quiche-quiche
+      #   uses: ./.github/actions/perfcompare-commands
+      #   with:
+      #     client: quiche
+      #     server: quiche
+      #     size: ${{ env.TRANSFER_SIZE }}
+      #     quiche-path: ${{ github.workspace }}/artifacts/build-quiche
+      #     testdata-path: ${{ github.workspace }}/testdata
+      #
+      # - name: Set command environment (quiche-quiche)
+      #   env:
+      #     BENCH_NAME: ${{ steps.cmd-quiche-quiche.outputs.bench-name }}
+      #     SERVER_CMD: ${{ steps.cmd-quiche-quiche.outputs.server-cmd }}
+      #     CLIENT_CMD: ${{ steps.cmd-quiche-quiche.outputs.client-cmd }}
+      #   run: |
+      #     {
+      #       echo "BENCH_NAME=$BENCH_NAME"
+      #       echo "SERVER_CMD=$SERVER_CMD"
+      #       echo "CLIENT_CMD=$CLIENT_CMD"
+      #     } >> "$GITHUB_ENV"
+      #
+      # - name: Start server (quiche-quiche)
+      #   run: |
+      #     # shellcheck disable=SC2086
+      #     nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
+      #     SERVER_PID=$!
+      #     echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+      #     sleep 3
+      #     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      #       echo "::error::Server (quiche-quiche) exited prematurely"
+      #       exit 1
+      #     fi
+      #     if ! ss -ulnp | grep -q ":4433 "; then
+      #       echo "::error::Server (quiche-quiche) is not listening on UDP port 4433"
+      #       kill "$SERVER_PID" 2>/dev/null || true
+      #       exit 1
+      #     fi
+      #
+      # - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness --force
+      #
+      # - name: Create benchmark config (quiche-quiche)
+      #   run: |
+      #     {
+      #       echo "benchmarks:"
+      #       echo "  - name: \"$BENCH_NAME\""
+      #       echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
+      #       echo "    options:"
+      #       echo "      warmup-time: 10s"
+      #       echo "      min-rounds: 150"
+      #     } > codspeed.yml
+      #
+      # - name: Run benchmark (quiche-quiche)
+      #   uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
+      #   env:
+      #     CODSPEED_PERF_ENABLED: false
+      #   with:
+      #     mode: walltime
+      #     working-directory: /tmp
+      #     upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
+      #     config: ${{ github.workspace }}/codspeed.yml
+      #
+      # - name: Stop server (quiche-quiche)
+      #   if: always()
+      #   run: kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true
+      #
+      # # --- google vs neqo ---
+      # - name: Generate commands (google-neqo)
+      #   id: cmd-google-neqo
+      #   uses: ./.github/actions/perfcompare-commands
+      #   with:
+      #     client: google
+      #     server: neqo
+      #     size: ${{ env.TRANSFER_SIZE }}
+      #     cubic: "true"
+      #     pacing: "true"
+      #     neqo-path: ${{ github.workspace }}/artifacts/build-neqo
+      #     google-path: ${{ github.workspace }}/artifacts/build-google
+      #     testdata-path: ${{ github.workspace }}/testdata
+      #
+      # - name: Set command environment (google-neqo)
+      #   env:
+      #     BENCH_NAME: ${{ steps.cmd-google-neqo.outputs.bench-name }}
+      #     SERVER_CMD: ${{ steps.cmd-google-neqo.outputs.server-cmd }}
+      #     CLIENT_CMD: ${{ steps.cmd-google-neqo.outputs.client-cmd }}
+      #   run: |
+      #     {
+      #       echo "BENCH_NAME=$BENCH_NAME"
+      #       echo "SERVER_CMD=$SERVER_CMD"
+      #       echo "CLIENT_CMD=$CLIENT_CMD"
+      #     } >> "$GITHUB_ENV"
+      #
+      # - name: Start server (google-neqo)
+      #   run: |
+      #     # shellcheck disable=SC2086
+      #     nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
+      #     SERVER_PID=$!
+      #     echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+      #     sleep 3
+      #     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      #       echo "::error::Server (google-neqo) exited prematurely"
+      #       exit 1
+      #     fi
+      #     if ! ss -ulnp | grep -q ":4433 "; then
+      #       echo "::error::Server (google-neqo) is not listening on UDP port 4433"
+      #       kill "$SERVER_PID" 2>/dev/null || true
+      #       exit 1
+      #     fi
+      #
+      # - name: Create benchmark config (google-neqo)
+      #   run: |
+      #     {
+      #       echo "benchmarks:"
+      #       echo "  - name: \"$BENCH_NAME\""
+      #       echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
+      #       echo "    options:"
+      #       echo "      warmup-time: 10s"
+      #       echo "      min-rounds: 100"
+      #     } > codspeed.yml
+      #
+      # - name: Run benchmark (google-neqo)
+      #   uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
+      #   env:
+      #     CODSPEED_PERF_ENABLED: false
+      #   with:
+      #     mode: walltime
+      #     working-directory: /tmp
+      #     upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
+      #     config: ${{ github.workspace }}/codspeed.yml
+      #
+      # - name: Stop server (google-neqo)
+      #   if: always()
+      #   run: kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true
 
       # --- quiche vs neqo ---
       - name: Generate commands (quiche-neqo)

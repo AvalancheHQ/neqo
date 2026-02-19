@@ -294,7 +294,7 @@ def process(cfg, name, bold):
     return row
 
 
-PAIRS = {("quiche", "quiche"), ("google", "neqo"), ("quiche", "neqo")}
+PAIRS = {("quiche", "neqo")}
 
 
 def run(cfg, tmp):
