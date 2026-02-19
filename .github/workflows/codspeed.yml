@@ -108,7 +108,7 @@ jobs:
       - name: Start server (quiche-neqo)
         run: |
           # shellcheck disable=SC2086
-          sudo nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
+          sudo -E nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
           SERVER_PID=$!
           echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
           sleep 3
@@ -127,7 +127,7 @@ jobs:
           {
             echo "benchmarks:"
             echo "  - name: \"$BENCH_NAME\""
-            echo "    exec: nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
+            echo "    exec: sudo -E nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
             echo "      warmup-time: 10s"
             echo "      min-rounds: 150"
@@ -199,8 +199,8 @@ jobs:
             # echo "QUICHE_QUICHE_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.client-cmd }}"
             # echo "GOOGLE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-google-neqo.outputs.server-cmd }}"
             # echo "GOOGLE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-google-neqo.outputs.client-cmd }}"
-            echo "QUICHE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.server-cmd }}"
-            echo "QUICHE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.client-cmd }}"
+            echo "QUICHE_NEQO_SERVER_CMD=sudo -E nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.server-cmd }}"
+            echo "QUICHE_NEQO_CLIENT_CMD=sudo -E nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.client-cmd }}"
           } >> "$GITHUB_ENV"
 
       - name: Run Criterion bench & upload results

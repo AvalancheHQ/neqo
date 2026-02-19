@@ -75,17 +75,16 @@ runs:
     # Enable Rust cache on GitHub-hosted runners. Minimizes cache pressure via
     # shared-key (6 entries: 3 OS × 2 toolchains). Only saves on main for
     # stable/MSRV; nightly changes too frequently.
-    - name: Enable Rust cache
-      uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      with:
-        shared-key: ${{ runner.os }}-${{ inputs.version }}${{ inputs.cache-key-suffix }} # Dirty but we are just iterating
-        cache-on-failure: "true"
-      # with:
-      #   cache-bin: false  # Using binstall for tools
-      #   cache-all-crates: false
-      #   shared-key: ${{ runner.os }}-${{ inputs.version }}
-      #   save-if: ${{ inputs.version != 'nightly' && (github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main') }}
-
+    # - name: Enable Rust cache
+    #   uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+    #   with:
+    # shared-key: ${{ runner.os }}-${{ inputs.version }}${{ inputs.cache-key-suffix }} # Dirty but we are just iterating
+    # cache-on-failure: "true"
+    # with:
+    #   cache-bin: false  # Using binstall for tools
+    #   cache-all-crates: false
+    #   shared-key: ${{ runner.os }}-${{ inputs.version }}
+    #   save-if: ${{ inputs.version != 'nightly' && (github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main') }}
     - name: Set up MSVC (Windows)
       if: ${{ runner.os == 'Windows' }}
       uses: ilammy/msvc-dev-cmd@v1 # zizmor: ignore[unpinned-uses]
