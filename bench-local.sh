@@ -190,6 +190,10 @@ info "Client: $CLIENT_CMD"
 # ---------------------------------------------------------------------------
 # 8. Start server
 # ---------------------------------------------------------------------------
+info "Killing any previously running server on port $PORT"
+sudo kill "$(sudo lsof -t -i UDP:"$PORT")" 2>/dev/null || true
+sleep 1
+
 info "Starting server"
 # shellcheck disable=SC2086
 sudo LD_LIBRARY_PATH="$LD_LIBRARY_PATH" nice -n -20 taskset -c "$SERVER_CPU" $SERVER_CMD &
