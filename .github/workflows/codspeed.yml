@@ -143,6 +143,7 @@ jobs:
           mode: walltime
           working-directory: /tmp
           upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
+          runner-version: branch:cod-2233-investigate-neqo-variance
           config: ${{ github.workspace }}/codspeed.yml
 
       - name: Stop server (quiche-neqo)
@@ -150,71 +151,71 @@ jobs:
         run: kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true
 
       # --- Criterion (walltime) benchmarks ---
-      - name: Build walltime benchmarks
-        run: |
-          cargo binstall cargo-codspeed --locked --force
-          cargo codspeed build -p neqo-bench --features bench --locked -m walltime
-
-      - name: Generate commands (quiche-quiche) for walltime
-        id: wt-cmd-quiche-quiche
-        uses: ./.github/actions/perfcompare-commands
-        with:
-          client: quiche
-          server: quiche
-          size: ${{ env.TRANSFER_SIZE }}
-          quiche-path: ${{ github.workspace }}/artifacts/build-quiche
-          testdata-path: ${{ github.workspace }}/testdata
-
-      - name: Generate commands (google-neqo) for walltime
-        id: wt-cmd-google-neqo
-        uses: ./.github/actions/perfcompare-commands
-        with:
-          client: google
-          server: neqo
-          size: ${{ env.TRANSFER_SIZE }}
-          cubic: "true"
-          pacing: "true"
-          neqo-path: ${{ github.workspace }}/artifacts/build-neqo
-          google-path: ${{ github.workspace }}/artifacts/build-google
-          testdata-path: ${{ github.workspace }}/testdata
-
-      - name: Generate commands (quiche-neqo) for walltime
-        id: wt-cmd-quiche-neqo
-        uses: ./.github/actions/perfcompare-commands
-        with:
-          client: quiche
-          server: neqo
-          size: ${{ env.TRANSFER_SIZE }}
-          cubic: "true"
-          pacing: "true"
-          neqo-path: ${{ github.workspace }}/artifacts/build-neqo
-          quiche-path: ${{ github.workspace }}/artifacts/build-quiche
-          testdata-path: ${{ github.workspace }}/testdata
-
-      - name: Set perfcompare environment
-        env:
-          SERVER_CPU: ${{ steps.cpu-tuning.outputs.server-cpu }}
-          CLIENT_CPU: ${{ steps.cpu-tuning.outputs.client-cpu }}
-        run: |
-          {
-            # echo "QUICHE_QUICHE_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.server-cmd }}"
-            # echo "QUICHE_QUICHE_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.client-cmd }}"
-            # echo "GOOGLE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-google-neqo.outputs.server-cmd }}"
-            # echo "GOOGLE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-google-neqo.outputs.client-cmd }}"
-            echo "QUICHE_NEQO_SERVER_CMD=sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.server-cmd }}"
-            echo "QUICHE_NEQO_CLIENT_CMD=sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.client-cmd }}"
-          } >> "$GITHUB_ENV"
-
-      - name: Run Criterion bench & upload results
-        uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
-        env:
-          CODSPEED_PERF_ENABLED: false
-        with:
-          mode: walltime
-          run: |
-            cargo binstall cargo-codspeed --locked --force
-            cargo codspeed run -p neqo-bench
-          upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
+      # - name: Build walltime benchmarks
+      #   run: |
+      #     cargo binstall cargo-codspeed --locked --force
+      #     cargo codspeed build -p neqo-bench --features bench --locked -m walltime
+      #
+      # - name: Generate commands (quiche-quiche) for walltime
+      #   id: wt-cmd-quiche-quiche
+      #   uses: ./.github/actions/perfcompare-commands
+      #   with:
+      #     client: quiche
+      #     server: quiche
+      #     size: ${{ env.TRANSFER_SIZE }}
+      #     quiche-path: ${{ github.workspace }}/artifacts/build-quiche
+      #     testdata-path: ${{ github.workspace }}/testdata
+      #
+      # - name: Generate commands (google-neqo) for walltime
+      #   id: wt-cmd-google-neqo
+      #   uses: ./.github/actions/perfcompare-commands
+      #   with:
+      #     client: google
+      #     server: neqo
+      #     size: ${{ env.TRANSFER_SIZE }}
+      #     cubic: "true"
+      #     pacing: "true"
+      #     neqo-path: ${{ github.workspace }}/artifacts/build-neqo
+      #     google-path: ${{ github.workspace }}/artifacts/build-google
+      #     testdata-path: ${{ github.workspace }}/testdata
+      #
+      # - name: Generate commands (quiche-neqo) for walltime
+      #   id: wt-cmd-quiche-neqo
+      #   uses: ./.github/actions/perfcompare-commands
+      #   with:
+      #     client: quiche
+      #     server: neqo
+      #     size: ${{ env.TRANSFER_SIZE }}
+      #     cubic: "true"
+      #     pacing: "true"
+      #     neqo-path: ${{ github.workspace }}/artifacts/build-neqo
+      #     quiche-path: ${{ github.workspace }}/artifacts/build-quiche
+      #     testdata-path: ${{ github.workspace }}/testdata
+      #
+      # - name: Set perfcompare environment
+      #   env:
+      #     SERVER_CPU: ${{ steps.cpu-tuning.outputs.server-cpu }}
+      #     CLIENT_CPU: ${{ steps.cpu-tuning.outputs.client-cpu }}
+      #   run: |
+      #     {
+      #       # echo "QUICHE_QUICHE_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.server-cmd }}"
+      #       # echo "QUICHE_QUICHE_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-quiche.outputs.client-cmd }}"
+      #       # echo "GOOGLE_NEQO_SERVER_CMD=nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-google-neqo.outputs.server-cmd }}"
+      #       # echo "GOOGLE_NEQO_CLIENT_CMD=nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-google-neqo.outputs.client-cmd }}"
+      #       echo "QUICHE_NEQO_SERVER_CMD=sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -n -20 taskset -c $SERVER_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.server-cmd }}"
+      #       echo "QUICHE_NEQO_CLIENT_CMD=sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -n -20 taskset -c $CLIENT_CPU ${{ steps.wt-cmd-quiche-neqo.outputs.client-cmd }}"
+      #     } >> "$GITHUB_ENV"
+      #
+      # - name: Run Criterion bench & upload results
+      #   uses: CodSpeedHQ/action@4deb3275dd364fb96fb074c953133d29ec96f80f # v4.10.6
+      #   env:
+      #     CODSPEED_PERF_ENABLED: false
+      #   with:
+      #     mode: walltime
+      #     run: |
+      #       cargo binstall cargo-codspeed --locked --force
+      #       cargo codspeed run -p neqo-bench
+      #     upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
 
       # --- quiche vs quiche ---
       # - name: Generate commands (quiche-quiche)
