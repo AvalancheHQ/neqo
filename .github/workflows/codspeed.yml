@@ -79,6 +79,8 @@ jobs:
             echo "CLIENT_CPU=$CLIENT_CPU"
           } >> "$GITHUB_ENV"
 
+      - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness --force
+
       # --- quiche vs neqo ---
       - name: Generate commands (quiche-neqo)
         id: cmd-quiche-neqo
@@ -127,7 +129,7 @@ jobs:
           {
             echo "benchmarks:"
             echo "  - name: \"$BENCH_NAME\""
-            echo "    exec: sudo --non-interactive -E nice -n -20 taskset -c $CLIENT_CPU $CLIENT_CMD"
+            echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
             echo "      warmup-time: 10s"
             echo "      min-rounds: 150"
@@ -253,8 +255,6 @@ jobs:
       #       kill "$SERVER_PID" 2>/dev/null || true
       #       exit 1
       #     fi
-      #
-      # - run: cargo install --locked --git https://github.com/CodSpeedHQ/codspeed --branch "cod-2233-investigate-neqo-variance" exec-harness --force
       #
       # - name: Create benchmark config (quiche-quiche)
       #   run: |
