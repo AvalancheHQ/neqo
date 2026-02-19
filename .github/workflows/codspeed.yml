@@ -194,6 +194,7 @@ jobs:
             echo "  - name: \"$BENCH_NAME\""
             echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
+            echo "      warmup-time: 10s"
             echo "      min-rounds: 150"
           } > codspeed.yml
 
@@ -261,6 +262,7 @@ jobs:
             echo "  - name: \"$BENCH_NAME\""
             echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
+            echo "      warmup-time: 10s"
             echo "      min-rounds: 100"
           } > codspeed.yml
 
@@ -328,6 +330,7 @@ jobs:
             echo "  - name: \"$BENCH_NAME\""
             echo "    exec: taskset -c $CLIENT_CPU $CLIENT_CMD"
             echo "    options:"
+            echo "      warmup-time: 10s"
             echo "      min-rounds: 150"
           } > codspeed.yml
 
