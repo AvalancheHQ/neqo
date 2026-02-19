@@ -225,6 +225,6 @@ EOF
 info "Benchmark config written to $CONFIG_FILE"
 info "Running benchmark..."
 
-CODSPEED_PERF_ENABLED=false exec-harness run --config "$CONFIG_FILE"
+CODSPEED_PERF_ENABLED=false codspeed run --config "$CONFIG_FILE" -m walltime
 
 info "Done."
