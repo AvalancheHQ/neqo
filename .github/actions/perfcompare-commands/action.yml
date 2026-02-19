@@ -102,7 +102,7 @@ runs:
           neqo)   CLIENT_CMD="$NEQO/neqo-client $NEQO_ARGS $INTEROP --output-dir . https://$HOST:$PORT/$SIZE" ;;
           msquic) CLIENT_CMD="$MSQUIC/quicinterop -test:D -custom:$HOST -port:$PORT -urls:https://$HOST:$PORT/$SIZE" ;;
           google) CLIENT_CMD="bash -c '$GOOGLE/quic_client --disable_certificate_verification https://$HOST:$PORT/$SIZE > $SIZE'" ;;
-          quiche) CLIENT_CMD="$QUICHE/quiche-client --no-verify --dump-responses . https://$HOST:$PORT/$SIZE" ;;
+          quiche) CLIENT_CMD="$QUICHE/quiche-client --no-verify https://$HOST:$PORT/$SIZE" ;;
           s2n)    CLIENT_CMD="$S2N/s2n-quic-qns interop client --tls rustls --disable-cert-verification --download-dir . --local-ip $HOST https://$HOST:$PORT/$SIZE" ;;
         esac
 
