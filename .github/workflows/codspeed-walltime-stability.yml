@@ -63,13 +63,15 @@ jobs:
           minimum-version: ${{ steps.nss-version.outputs.minimum }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build every walltime bench up front; `cargo codspeed run` then runs
-      # all of them in a single measured pass.
+      # Build all three walltime benches in one pass (shared compilation), then
+      # `cargo codspeed run` runs them together. `--measurement-mode walltime`
+      # is explicit but redundant here: cargo-codspeed auto-selects walltime on
+      # macro runners via CODSPEED_RUNNER_MODE.
       - name: Build walltime benches
         run: |
-          cargo codspeed build --locked --features bench --measurement-mode walltime --package neqo-transport --bench transfer_walltime
-          cargo codspeed build --locked --features bench --measurement-mode walltime --package neqo-http3 --bench streams_walltime
-          cargo codspeed build --locked --features bench --measurement-mode walltime --package neqo-bin --bench main
+          cargo codspeed build --locked --features bench --measurement-mode walltime \
+            --package neqo-transport --package neqo-http3 --package neqo-bin \
+            --bench transfer_walltime --bench streams_walltime --bench main
 
       # NOTE: No CPU tuning here on purpose. These Cherry macro runners are
       # already tuned for benchmarking at the kernel level (isolcpus/nohz_full/
