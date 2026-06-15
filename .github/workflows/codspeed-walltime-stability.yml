@@ -43,6 +43,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # The Cherry runners ship rustup/cargo under ~/.cargo/bin but it is not on
+      # the runner's default job PATH, so make it visible before any Rust step.
+      - name: Add ~/.cargo/bin to PATH
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
       - uses: mozilla/actions/rust@7cca521fd0ace71bc6ee830c4a98297023e3402b # v1.1.18
         with:
           version: stable
