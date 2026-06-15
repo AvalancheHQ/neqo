@@ -10,7 +10,7 @@
     reason = "Inherent in codspeed criterion_group! macro."
 )]
 
-use std::{env, hint::black_box, net::SocketAddr};
+use std::{env, hint::black_box, net::SocketAddr, time::Duration};
 
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use neqo_bin::{client, server};
@@ -23,8 +23,73 @@ struct Benchmark {
     download_size: usize,
 }
 
+/// Returns the CPUs this process is allowed to run on (its affinity mask). On a
+/// CodSpeed macro runner this is the dedicated benchmark die (e.g. cores 8-15).
+#[cfg(target_os = "linux")]
+fn current_affinity() -> Vec<usize> {
+    // SAFETY: `set` is zero-initialized and sized correctly for the call.
+    unsafe {
+        let mut set: libc::cpu_set_t = std::mem::zeroed();
+        if libc::sched_getaffinity(0, size_of::<libc::cpu_set_t>(), &mut set) != 0 {
+            return Vec::new();
+        }
+        (0..libc::CPU_SETSIZE as usize)
+            .filter(|&cpu| libc::CPU_ISSET(cpu, &set))
+            .collect()
+    }
+}
+
+/// Pins the calling thread to a single CPU. Best-effort: errors are ignored.
+#[cfg(target_os = "linux")]
+fn pin_current_thread(cpu: usize) {
+    // SAFETY: `set` is zero-initialized and sized correctly for the call.
+    unsafe {
+        let mut set: libc::cpu_set_t = std::mem::zeroed();
+        libc::CPU_SET(cpu, &mut set);
+        libc::sched_setaffinity(0, size_of::<libc::cpu_set_t>(), &set);
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn current_affinity() -> Vec<usize> {
+    Vec::new()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn pin_current_thread(_cpu: usize) {}
+
+/// Picks distinct CPUs to pin the server and client threads to, returning
+/// `(server_cpu, client_cpu)`.
+///
+/// Honors the `NEQO_BENCH_SERVER_CPU` / `NEQO_BENCH_CLIENT_CPU` env vars when
+/// set; otherwise picks the two highest CPUs from the process's affinity mask
+/// (the dedicated benchmark cores). Returns `None` when fewer than two distinct
+/// CPUs are available, in which case threads are left unpinned.
+fn bench_cpus() -> Option<(usize, usize)> {
+    let env_cpu = |name| env::var(name).ok().and_then(|v| v.parse::<usize>().ok());
+    let cpus = current_affinity();
+    let server = env_cpu("NEQO_BENCH_SERVER_CPU").or_else(|| cpus.last().copied())?;
+    let client = env_cpu("NEQO_BENCH_CLIENT_CPU")
+        .or_else(|| cpus.iter().rev().find(|&&c| c != server).copied())?;
+    (server != client).then_some((server, client))
+}
+
 fn transfer(c: &mut Criterion) {
     test_fixture::fixture_init();
+
+    // Pin the client (this) thread and the server thread to distinct dedicated
+    // cores so they don't migrate or contend during measurement. This mostly
+    // matters for the RPS/HPS benches; the large transfers are less sensitive.
+    let server_cpu = match bench_cpus() {
+        Some((server, client)) => {
+            eprintln!(
+                "[bench] pinning client thread to CPU {client}, server thread to CPU {server}"
+            );
+            pin_current_thread(client);
+            Some(server)
+        }
+        None => None,
+    };
 
     let mtu_suffix = env::var("MTU").ok().map(|mtu| format!("/mtu-{mtu}"));
     for Benchmark {
@@ -71,7 +136,7 @@ fn transfer(c: &mut Criterion) {
             b.to_async(Builder::new_current_thread().enable_all().build().unwrap())
                 .iter_batched(
                     || {
-                        let (server_handle, server_addr) = spawn_server();
+                        let (server_handle, server_addr) = spawn_server(server_cpu);
                         let client = client::client(client::Args::new(
                             Some(server_addr),
                             num_requests,
@@ -94,10 +159,13 @@ fn transfer(c: &mut Criterion) {
     }
 }
 
-fn spawn_server() -> (tokio::sync::oneshot::Sender<()>, SocketAddr) {
+fn spawn_server(pin_cpu: Option<usize>) -> (tokio::sync::oneshot::Sender<()>, SocketAddr) {
     let (done_sender, mut done_receiver) = tokio::sync::oneshot::channel();
     let (addr_sender, addr_receiver) = std::sync::mpsc::channel::<SocketAddr>();
     std::thread::spawn(move || {
+        if let Some(cpu) = pin_cpu {
+            pin_current_thread(cpu);
+        }
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         let mut args = server::Args::default();
@@ -122,5 +190,16 @@ fn spawn_server() -> (tokio::sync::oneshot::Sender<()>, SocketAddr) {
     (done_sender, addr_receiver.recv().unwrap())
 }
 
-criterion_group!(benches, transfer);
+criterion_group! {
+    name = benches;
+    // Longer warm-up and measurement than Criterion's 3s/5s defaults: the
+    // throughput benches could not fit 100 samples into the default 5s window
+    // (Criterion warned, e.g. RPS needed ~12.8s), which widened their
+    // confidence intervals. Matches the configuration used by the
+    // transfer_walltime bench.
+    config = Criterion::default()
+        .warm_up_time(Duration::from_secs(5))
+        .measurement_time(Duration::from_secs(15));
+    targets = transfer
+}
 criterion_main!(benches);
