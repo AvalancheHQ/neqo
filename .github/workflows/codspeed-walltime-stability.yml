@@ -7,8 +7,11 @@ name: CodSpeed Walltime Stability
 # GitHub-hosted runners).
 on:
   schedule:
-    # Every 5 minutes (GitHub's effective floor for scheduled workflows) so
-    # each of the 3 runners keeps picking up work and we accumulate data fast.
+    # Every 5 minutes (GitHub's effective floor for scheduled workflows). Each
+    # tick launches one job per machine; with ~7 min runs there is always a
+    # pending tick ready to start the instant the machines free up, so all
+    # three runners stay busy back-to-back. The pending slot also bridges the
+    # occasional late cron tick.
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
@@ -16,12 +19,6 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   RUSTUP_TOOLCHAIN: stable
-
-# Serialize runs: never cancel an in-flight run (we want every data point),
-# but don't let scheduled runs pile up and overlap on the limited runner pool.
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -33,11 +30,22 @@ defaults:
 
 jobs:
   walltime:
-    name: Walltime benches
-    # One job runs the whole walltime suite, so each scheduled tick is one
-    # machine producing one coherent data point. Round-robins onto any free
-    # Cherry box carrying the dedicated label.
+    name: Walltime benches (slot ${{ matrix.slot }})
+    # Fan out one job per machine each tick. The three jobs round-robin onto
+    # the three free Cherry boxes (one job per runner), so every machine runs
+    # the suite in parallel.
     runs-on: [self-hosted, walltime-stability]
+    strategy:
+      fail-fast: false # one machine failing must not cancel the others
+      matrix:
+        slot: [1, 2, 3]
+    # Per-slot concurrency: the three slots run in parallel, but a slot never
+    # overlaps itself. cancel-in-progress: false keeps every data point in
+    # flight; GitHub caps the backlog at one running + one pending run per slot,
+    # so ticks never pile up unboundedly while keeping a successor queued.
+    concurrency:
+      group: ${{ github.workflow }}-slot-${{ matrix.slot }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
