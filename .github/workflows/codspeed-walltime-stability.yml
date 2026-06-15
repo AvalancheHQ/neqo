@@ -1,0 +1,85 @@
+name: CodSpeed Walltime Stability
+# Stability study: repeatedly run the walltime benchmarks on dedicated
+# bare-metal (Cherry AMD Ryzen 9950X) self-hosted runners and upload the
+# results to CodSpeed, so we can measure run-to-run variance on the same
+# commit. These benches are intentionally excluded from the regular
+# `codspeed.yml` matrix (which only runs deterministic simulation modes on
+# GitHub-hosted runners).
+on:
+  schedule:
+    # Every 5 minutes (GitHub's effective floor for scheduled workflows) so
+    # each of the 3 runners keeps picking up work and we accumulate data fast.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTUP_TOOLCHAIN: stable
+
+# Serialize runs: never cancel an in-flight run (we want every data point),
+# but don't let scheduled runs pile up and overlap on the limited runner pool.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # Authenticate to CodSpeed via OIDC instead of CODSPEED_TOKEN.
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  walltime:
+    name: Walltime benches
+    # One job runs the whole walltime suite, so each scheduled tick is one
+    # machine producing one coherent data point. Round-robins onto any free
+    # Cherry box carrying the dedicated label.
+    runs-on: [self-hosted, walltime-stability]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: mozilla/actions/rust@7cca521fd0ace71bc6ee830c4a98297023e3402b # v1.1.18
+        with:
+          version: stable
+          tools: cargo-codspeed
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: nss-version
+        uses: ./.github/actions/minimum-version
+        with:
+          directory: .
+      - uses: mozilla/actions/nss@7cca521fd0ace71bc6ee830c4a98297023e3402b # v1.1.18
+        with:
+          minimum-version: ${{ steps.nss-version.outputs.minimum }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build every walltime bench up front; `cargo codspeed run` then runs
+      # all of them in a single measured pass.
+      - name: Build walltime benches
+        run: |
+          cargo codspeed build --locked --features bench --measurement-mode walltime --package neqo-transport --bench transfer_walltime
+          cargo codspeed build --locked --features bench --measurement-mode walltime --package neqo-http3 --bench streams_walltime
+          cargo codspeed build --locked --features bench --measurement-mode walltime --package neqo-bin --bench main
+
+      # NOTE: No CPU tuning here on purpose. These Cherry macro runners are
+      # already tuned for benchmarking at the kernel level (isolcpus/nohz_full/
+      # nosmt) and at boot (codspeed-cpu-tuning.service: performance governor,
+      # turbo off), and reserve CPUs 8-15 as a dedicated benchmark die
+      # (codspeed.slice). The CodSpeed walltime runner pins the benchmark to
+      # that die and evicts other work via the codspeed-pre-bench/-post-bench
+      # hooks. Running neqo's ./.github/actions/cpu-tuning here would fight that
+      # setup (it shells out to `cset`, which isn't installed, and builds its
+      # own exclusive cgroup-v1 sets).
+      # No `token:` here on purpose — with `id-token: write` granted above, the
+      # action authenticates to CodSpeed via GitHub OIDC. Requires OIDC trust to
+      # be enabled for this repo in CodSpeed settings.
+      - name: Run bench & upload results
+        uses: CodSpeedHQ/action@9d332c4d90b43981c3e55ae8e38e68709996240f # v4.17.0
+        with:
+          mode: walltime
+          run: cargo codspeed run
