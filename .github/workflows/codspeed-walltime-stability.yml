@@ -39,13 +39,9 @@ jobs:
       fail-fast: false # one machine failing must not cancel the others
       matrix:
         slot: [1, 2, 3]
-    # Per-slot concurrency: the three slots run in parallel, but a slot never
-    # overlaps itself. cancel-in-progress: false keeps every data point in
-    # flight; GitHub caps the backlog at one running + one pending run per slot,
-    # so ticks never pile up unboundedly while keeping a successor queued.
-    concurrency:
-      group: ${{ github.workflow }}-slot-${{ matrix.slot }}
-      cancel-in-progress: false
+    # No concurrency cap: every dispatched run must execute (we drive the
+    # stability study by queuing many runs), draining across the three runners
+    # rather than being cancelled as superseded.
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
